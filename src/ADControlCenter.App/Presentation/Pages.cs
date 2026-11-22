@@ -125,7 +125,7 @@ public sealed class RecordsPage : Bindable
         bool status(string value) => _filter == Options[0] || _filter == value;
         return obj switch
         {
-            DirectoryUser u => search(u.DisplayName, u.Username, u.Department) && unit(u.Department) && status(u.Status),
+            DirectoryUser u => search(u.DisplayName, u.Username, u.Department, u.EmployeeInfo?.Department ?? "") && unit(u.Department) && status(u.Status),
             Computer c => search(c.Name, c.OperatingSystem, c.Department) && unit(c.Department) && status(c.Status) && (_os == "All systems" || _os == c.OperatingSystem),
             DirectoryGroup g => search(g.Name, g.Description) && status(g.MemberCount == 0 ? "Empty" : "With members"),
             AuditEntry a => search(a.Actor, a.Action, a.Target, a.Details, a.Outcome) && status(a.Outcome),

@@ -3,6 +3,8 @@ namespace ADControlCenter.Core;
 public sealed record DirectoryUser(Guid Id, string DisplayName, string Username, string Department,
     bool Enabled, bool Locked, DateTimeOffset? LastPasswordSimulation = null)
 {
+    public Admin.Employee? EmployeeInfo { get; init; }
+    public bool ChangeAtLogon { get; init; }
     public string Status => !Enabled ? "Disabled" : Locked ? "Locked" : "Active";
 }
 

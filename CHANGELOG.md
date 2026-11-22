@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0
+
+- Added a six-step employee onboarding wizard with configurable department templates, secure temporary password input, explicit confirmation and per-step results.
+- Added attribute editing, account enable/disable and confirmed direct membership changes for approved disposable lab users and groups.
+- Added per-connection Live Administration Mode for the delegated AppTesting operator. The server checks permissions on each write. Demo Mode and live read-only browsing remain available.
+- Added a private UTC administration journal, partial-failure handling, offline regression tests and desktop coverage for onboarding and editing.
+
 ## 1.1.1
 
 - Fixed the Reports selector so both the open list and selected value display friendly dataset names.

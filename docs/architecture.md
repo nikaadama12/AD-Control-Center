@@ -34,6 +34,12 @@ Version 1.1 also injects an `ILiveConnector`. An authenticated connection return
 
 The shell serializes network operations and publishes a new snapshot only after all pages succeed. Live navigation, command eligibility and execution are distinct from the demo mutation path. A failed test or incomplete initial load keeps the app in Demo Mode. Disconnect discards the session's objects and audit entries. Export uses the existing encoders and a dedicated private folder.
 
+## Scoped administration
+
+The shell injects an `AdminWorkflow` into the onboarding and account editor page models. `IAdminBackend` supplies a catalog and prepares one typed change at a time. The demo backend uses the existing workspace commit path. The LDAP reader exposes a separate, connection-bound administration capability after the operator and policy are verified. Disabling administration or disconnecting invalidates the capability.
+
+Each prepared change carries the target and before/after values. The workflow flushes intent to the private journal before calling the provider. The live provider repeats its identity, location, membership and precondition checks immediately before sending the typed request on the existing secured connection. The controller evaluates its own access controls. Acknowledgement, denial and indeterminate transport outcomes are recorded individually. Setup and group updates span multiple requests. An interruption can leave a disabled account or partially applied memberships.
+
 ## Operating envelope
 
 The synchronous snapshot store is intended for a single operator and a small fictional directory. Each commit rewrites the JSON file, including the audit history. The stale-device calculation uses elapsed UTC time. Dashboard account states are mutually exclusive: disabled accounts appear under Disabled, enabled locked accounts under Locked, and the remaining accounts under Active.

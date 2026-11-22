@@ -1,5 +1,6 @@
 using System.DirectoryServices.Protocols;
 using System.Globalization;
+using ADControlCenter.Core.Admin;
 using System.Net;
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
@@ -98,8 +99,10 @@ public sealed class LdapConnector : ILiveConnector
 }
 
 [SupportedOSPlatform("windows")]
-internal sealed class LdapReader(LdapConnection connection, string namingContext) : ILiveReader
+internal sealed class LdapReader(LdapConnection connection, string namingContext) : ILiveReader, IAdministrationSource
 {
+    public IAdminBackend Activate(LabPolicy policy, Func<IReadOnlyList<LiveObject>> snapshot, Func<bool> active) =>
+        new LdapAdministration(connection, policy, snapshot, active);
     public string NamingContext => namingContext;
     public void Dispose() => connection.Dispose();
     internal static string[] Values(SearchResultEntry entry, string attribute) =>
@@ -143,7 +146,7 @@ internal sealed class LdapReader(LdapConnection connection, string namingContext
             {
                 var request = new SearchRequest(NamingContext, filter, SearchScope.Subtree, "name", "displayName", "sAMAccountName",
                     "userAccountControl", "msDS-User-Account-Control-Computed", "operatingSystem", "mail", "description", "dNSHostName",
-                    "lastLogonTimestamp", "member", "memberOf", "groupType");
+                    "lastLogonTimestamp", "member", "memberOf", "groupType", "objectGUID", "givenName", "sn", "department", "title", "userPrincipalName");
                 var paging = new PageResultRequestControl(250) { IsCritical = true };
                 request.Controls.Add(paging);
                 do
@@ -162,13 +165,17 @@ internal sealed class LdapReader(LdapConnection connection, string namingContext
                         }
                         long.TryParse(Get("lastLogonTimestamp"), CultureInfo.InvariantCulture, out long time);
                         string display = Get("displayName");
+                        long.TryParse(Get("groupType"), CultureInfo.InvariantCulture, out long groupType);
                         objects.Add(new(kind, display.Length > 0 ? display : Get("name"), entry.DistinguishedName, Get("sAMAccountName"),
                             status, Get("operatingSystem"), Get("mail"), Get("description"), Get("dNSHostName"),
                             time > 0 && time <= DateTime.MaxValue.ToFileTimeUtc() ? DateTimeOffset.FromFileTime(time).ToUniversalTime() : null,
                             ReadLinks(entry, "member", token), ReadLinks(entry, "memberOf", token))
                         {
-                            IsSecurityGroup = kind == ObjectKind.Groups && long.TryParse(Get("groupType"), CultureInfo.InvariantCulture, out long groupType)
-                                && (groupType & 0x80000000L) != 0
+                            Id = entry.Attributes["objectGUID"]?.GetValues(typeof(byte[])).FirstOrDefault() is byte[] guid && guid.Length == 16 ? new Guid(guid) : Guid.Empty,
+                            EmployeeInfo = kind == ObjectKind.Users ? new(Get("givenName"),Get("sn"),display,Get("sAMAccountName"),Get("userPrincipalName"),
+                                Get("department"),Get("title"),Get("mail"),Get("description")) : null,
+                            GroupScope = kind != ObjectKind.Groups ? "" : (groupType & 8) != 0 ? "Universal" : (groupType & 4) != 0 ? "Domain local" : "Global",
+                            IsSecurityGroup = kind == ObjectKind.Groups && (groupType & 0x80000000L) != 0
                         });
                     }
                     paging.Cookie = result.Controls.OfType<PageResultResponseControl>().SingleOrDefault()?.Cookie

@@ -24,6 +24,12 @@ Use the [lab acceptance checklist](live-lab.md) to verify real binds, trust, obj
 
 The v1.1.1 cases render the themed WPF selector and verify the dropdown label, closed label and typed selection for each dataset in both modes. Export tests compare the complete aggregate file before and after replacing fixture identifiers. They also check all six metrics, empty inventories, security-group filtering, output schemas, destination restrictions and cancelling before file creation. Live Read-Only Mode uses a mock provider with synthetic records.
 
+## Administration coverage
+
+The administration tests drive all six wizard steps, confirmation and cancellation, field validation, department templates, OU and group policy checks, capability revocation, stale proposals and existing records with missing optional attributes. A mock provider can deny a step or apply it and lose its acknowledgement. Tests check which steps ran, whether later writes stopped, whether password material reached output, and whether group add/remove and account edits preserved other state.
+
+Controller-specific ACLs, bind identity, effective group reads and password policy require a separately approved lab test. See [manual acceptance](onboarding.md#manual-lab-acceptance).
+
 ## Desktop smoke test
 
 Close any prior smoke-test file picker and run the script in a Windows PowerShell session after building Release.
@@ -32,7 +38,7 @@ Close any prior smoke-test file picker and run the script in a Windows PowerShel
 .\scripts\Test-Desktop.ps1
 ```
 
-The test launches a separate application instance with `ADCC_DEMO_HOME` set to a temporary folder. It uses Windows UI Automation to operate the actual buttons, fields, filters and modal dialogs. It checks the initial sample totals, a blank form error, creating and editing a user, enabling/disabling, simulated unlock and reset, computer filters, group membership changes, theme persistence, CSV import preview/cancel/apply, report contents and clear/restore confirmation. It closes the process and deletes only its generated workspace.
+The test launches a separate application instance with `ADCC_DEMO_HOME` set to a temporary folder. It uses Windows UI Automation to operate the actual buttons, fields, filters and modal dialogs. It checks the initial sample totals, a blank form error, creating and editing a user, enabling/disabling, simulated unlock and reset, computer filters, group membership changes, theme persistence, CSV import preview/cancel/apply, report contents and clear/restore confirmation. It then completes onboarding with a department template, opens the account details, edits the fixture and verifies the administration journal. It closes the process and deletes only its generated workspace.
 
 The script also accepts an executable path, so the same checks can exercise a published build.
 
@@ -42,7 +48,7 @@ The script also accepts an executable path, so the same checks can exercise a pu
 
 ## Capture portfolio screenshots
 
-Regenerate the README images from a fresh isolated sample directory. The script captures the app window itself and writes `dashboard.png` and `users.png`. Existing images with these names are replaced.
+Regenerate the README images from a fresh isolated sample directory. The script captures the app window itself and writes `dashboard.png`, `users.png` and `onboarding.png`. Existing images with these names are replaced.
 
 ```powershell
 .\scripts\Test-Desktop.ps1 -ScreenshotDirectory .\docs\screenshots

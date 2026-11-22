@@ -29,15 +29,20 @@ public static class ReportWriter
         return WriteRows(data.Settings.ExportDirectory, "demo", kind, format, table.Headers, table.Rows, "northstar.example · Fictional directory");
     }
 
-    public static string WriteLive(string folder, IReadOnlyList<LiveObject> snapshot, ReportKind kind, ReportFormat format)
+    internal static void RequirePrivateFolder(string folder)
     {
-        if (format is not (ReportFormat.Csv or ReportFormat.Html)) throw new DirectoryException("Choose CSV or HTML for a live report.");
         for (var dir = new DirectoryInfo(folder); dir != null; dir = dir.Parent)
         {
             if (Directory.Exists(Path.Combine(dir.FullName, ".git")) || File.Exists(Path.Combine(dir.FullName, ".git")) ||
                 dir.Exists && dir.Attributes.HasFlag(FileAttributes.ReparsePoint))
-                throw new DirectoryException("Live exports require a private location outside Git and linked directories.");
+                throw new DirectoryException("Live directory files require a private location outside Git and linked directories.");
         }
+    }
+
+    public static string WriteLive(string folder, IReadOnlyList<LiveObject> snapshot, ReportKind kind, ReportFormat format)
+    {
+        if (format is not (ReportFormat.Csv or ReportFormat.Html)) throw new DirectoryException("Choose CSV or HTML for a live report.");
+        RequirePrivateFolder(folder);
         if (kind == ReportKind.CountsOnly)
         {
             var users = snapshot.Where(o => o.Kind == ObjectKind.Users).ToArray();

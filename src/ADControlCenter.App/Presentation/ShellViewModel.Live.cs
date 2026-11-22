@@ -3,6 +3,7 @@ using System.Security;
 using System.Windows.Input;
 using ADControlCenter.Core;
 using ADControlCenter.Core.Live;
+using ADControlCenter.Core.Admin;
 
 namespace ADControlCenter.App.Presentation;
 
@@ -15,22 +16,34 @@ public sealed partial class ShellViewModel
     private static readonly NavItem Manager = new("Connection Manager", "Shield");
     private static readonly NavItem[] LiveNavigation = [new("Dashboard","Dashboard"), new("Users","Users"), new("Computers","Computers"),
         new("Groups","Groups"), new("Organizational Units","Directory"), new("Reports","Reports"), new("Audit Logs","Audit"), Manager];
-    public IEnumerable<NavItem> Navigation => IsLive ? LiveNavigation : DemoNavigation.Append(Manager);
+    private static readonly NavItem[] AdminNavigation=[new("Onboarding","Users"),new("Account administration","Groups"),new("Administration history","Audit")];
+    private readonly AdminWorkflow? _demoAdmin;
+    private AdminWorkflow? _liveAdmin;
+    private AdminWorkflow? ActiveWorkflow=>IsLive?_liveAdmin:_demoAdmin;
+    public bool IsAdministration=>IsLive && _liveAdmin!=null;
+    public IEnumerable<NavItem> Navigation => (IsLive ? LiveNavigation.AsEnumerable() : DemoNavigation.Append(Manager))
+        .Concat(ActiveWorkflow==null?[]:AdminNavigation).ToArray();
     public bool IsLive => _live.Connected;
     public bool CanConnect => !Busy && !IsLive;
     public bool CanDisconnect => !Busy && IsLive;
     public bool Busy => _operation != null;
-    public string ModeLabel => IsLive ? "LIVE READ-ONLY MODE" : "DEMO MODE";
+    public string ModeLabel => IsAdministration ? "LIVE ADMINISTRATION MODE" : IsLive ? "LIVE READ-ONLY MODE" : "DEMO MODE";
     public string DirectoryLabel => IsLive ? _live.Host : "northstar.example";
     public string DirectoryType => IsLive ? "DOMAIN CONTROLLER" : "LOCAL DIRECTORY";
-    public string OperatorLabel => IsLive ? "Directory reader" : "Demo Operator";
+    public string OperatorLabel => IsAdministration ? _liveAdmin!.Actor : IsLive ? "Directory reader" : "Demo Operator";
     public string OperatorDetail => IsLive ? "Authenticated session" : "Local administrator demo";
-    public string Initials => IsLive ? "RO" : "DO";
+    public string Initials => IsAdministration ? "AD" : IsLive ? "RO" : "DO";
     private string PrivateExports { get; }
+    private string _previousMode = "DEMO MODE";
     private void NotifySession()
     {
-        foreach (string property in new[] { nameof(Navigation), nameof(IsLive), nameof(CanConnect), nameof(CanDisconnect), nameof(Busy),
-            nameof(ModeLabel), nameof(DirectoryLabel), nameof(DirectoryType), nameof(OperatorLabel), nameof(OperatorDetail), nameof(Initials), nameof(Subtitle) })
+        if (_previousMode != ModeLabel)
+        {
+            _previousMode = ModeLabel;
+            Changed(nameof(Navigation));
+        }
+        foreach (string property in new[] { nameof(IsLive), nameof(CanConnect), nameof(CanDisconnect), nameof(Busy),
+            nameof(IsAdministration), nameof(ModeLabel), nameof(DirectoryLabel), nameof(DirectoryType), nameof(OperatorLabel), nameof(OperatorDetail), nameof(Initials), nameof(Subtitle) })
             Changed(property);
         CommandManager.InvalidateRequerySuggested();
     }
@@ -88,7 +101,7 @@ public sealed partial class ShellViewModel
         Status = $"Live snapshot refreshed at {_loaded:T}";
     });
     public void CancelOperation() => _operation?.Cancel();
-    public void CloseSession() => _live.Dispose();
+    public void CloseSession() { if(Page is IDisposable disposable) disposable.Dispose(); _liveAdmin=null; _live.Dispose(); }
 
     private void Record(string action, string target, string outcome, string detail)
     {
@@ -108,11 +121,46 @@ public sealed partial class ShellViewModel
         };
     }
 
+    private async Task EnableAdministrationAsync()
+    {
+        if (!IsLive || Busy || IsAdministration || !_ui.Confirm("Enable live administration?",
+            "This connection will be allowed to submit confirmed changes in the approved AppTesting OUs as the delegated lab operator.","Enable administration")) return;
+        AdminWorkflow? workflow=null;
+        await NetworkAsync("Verifying delegated identity and lab scope…", token =>
+        {
+            var backend=_live.EnableAdministration(LabPolicy.Load());
+            var path=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"AD Control Center","Administration","audit.jsonl");
+            workflow=new(backend,new FileAdminAudit(path,live:true));
+        }, () => { _liveAdmin=workflow; Status="Live administration enabled for this connection."; });
+    }
+
+    private async Task<AdminResult> RunAdminAsync(Func<AdminResult> work)
+    {
+        if (Busy || ActiveWorkflow==null) throw new DirectoryException("Administration is unavailable.");
+        using var operation=new CancellationTokenSource();
+        _operation=operation; Status="Applying reviewed operations…"; NotifySession();
+        try
+        {
+            var result=await Task.Run(work);
+            Status=result.Success?"Reviewed changes completed.":"Review the operation results before continuing.";
+            if(IsLive)
+            {
+                try { await Task.Run(()=>_live.Refresh(operation.Token)); _loaded=DateTimeOffset.Now; }
+                catch (Exception) { Status+=" Inventory refresh failed. Refresh before making another change."; }
+            }
+            return result;
+        }
+        finally { _operation=null; NotifySession(); }
+    }
+
     private void ExecuteLive(string action)
     {
         switch (action)
         {
+            case "EnableAdministration": _=EnableAdministrationAsync(); break;
+            case "EndAdministration": _live.DisableAdministration(); _liveAdmin=null; NotifySession(); Load(); Status="Live read-only mode restored."; break;
             case "Disconnect":
+                _liveAdmin=null;
                 _live.Dispose();
                 _events.Clear();
                 Current = DemoNavigation[0];

@@ -1,4 +1,5 @@
 using System.Net;
+using ADControlCenter.Core.Admin;
 
 namespace ADControlCenter.Core.Live;
 
@@ -19,6 +20,9 @@ public sealed record LiveObject(ObjectKind Kind, string Name, string Distinguish
     string Status, string Platform, string Email, string Description, string Hostname, DateTimeOffset? LastLogon,
     IReadOnlyList<string> Members, IReadOnlyList<string> MemberOf)
 {
+    public Guid Id { get; init; }
+    public Employee? EmployeeInfo { get; init; }
+    public string GroupScope { get; init; } = "";
     public bool IsSecurityGroup { get; init; }
     public string Parent => ParentOf(DistinguishedName);
     public static string ParentOf(string dn)
@@ -32,7 +36,8 @@ public sealed record LiveObject(ObjectKind Kind, string Name, string Distinguish
     }
     public string Details => string.Join(Environment.NewLine, new[]
     {
-        $"Distinguished name   {DistinguishedName}", $"Parent   {Parent}", Field("Account", Account),
+        $"Distinguished name   {DistinguishedName}", $"Parent   {Parent}", Field("Account", Account), Field("Department",EmployeeInfo?.Department), Field("Job title",EmployeeInfo?.Title), Field("UPN",EmployeeInfo?.Upn),
+        Field("Group scope",GroupScope), Kind == ObjectKind.Groups ? $"Category   {(IsSecurityGroup ? "Security" : "Distribution")}" : "",
         Field("State", Status), Field("Operating system", Platform), Field("DNS hostname", Hostname),
         Field("Email", Email), Field("Description", Description), Field("Replicated last logon", LastLogon?.ToLocalTime().ToString("g")),
         Kind == ObjectKind.Groups ? $"Direct members ({Members.Count})\n{string.Join("\n", Members)}" : "",
@@ -41,7 +46,7 @@ public sealed record LiveObject(ObjectKind Kind, string Name, string Distinguish
     private static string Field(string label, string? value) => string.IsNullOrEmpty(value) ? "" : $"{label}   {value}";
 }
 
-// A live connection can only bind, search and close. Demo mutation APIs are deliberately absent.
+// Inventory consumers receive a read-only interface. Administration requires a separate session capability.
 public interface ILiveReader : IDisposable
 {
     string NamingContext { get; }
@@ -56,6 +61,17 @@ public interface ILiveConnector
 public sealed class LiveSession(ILiveConnector connector) : IDisposable
 {
     private ILiveReader? _reader;
+    private Guid _administrationLease;
+    public IAdminBackend EnableAdministration(LabPolicy policy)
+    {
+        policy.Validate();
+        if (!Host.Equals(LabPolicy.Controller,StringComparison.OrdinalIgnoreCase) || _reader is not IAdministrationSource source ||
+            !_reader.NamingContext.Equals(LabPolicy.Base,StringComparison.OrdinalIgnoreCase)) throw new DirectoryException("Administration requires the approved lab controller.");
+        var lease = _administrationLease = Guid.NewGuid();
+        try { return source.Activate(policy, () => Objects, () => _administrationLease == lease && Connected); }
+        catch { DisableAdministration(); throw; }
+    }
+    public void DisableAdministration() => _administrationLease = Guid.Empty;
     public bool Connected => _reader != null;
     public IReadOnlyList<LiveObject> Objects { get; private set; } = [];
     public string Host { get; private set; } = "";
@@ -87,6 +103,7 @@ public sealed class LiveSession(ILiveConnector connector) : IDisposable
     }
     public void Dispose()
     {
+        DisableAdministration();
         _reader?.Dispose();
         _reader = null;
         Objects = [];
@@ -102,7 +119,7 @@ public static class LiveQuery
     {
         var matches = source.Where(o => (parent.Length == 0 || o.Parent.Equals(parent, StringComparison.OrdinalIgnoreCase))
             && (state.Length == 0 || o.Status == state)
-            && new[] { o.Name, o.Account, o.DistinguishedName, o.Email, o.Hostname, o.Platform }.Any(s => s.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase)))
+            && new[] { o.Name, o.Account, o.DistinguishedName, o.Email, o.Hostname, o.Platform, o.EmployeeInfo?.Department ?? "" }.Any(s => s.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase)))
             .OrderBy(o => o.Name, StringComparer.OrdinalIgnoreCase).ThenBy(o => o.DistinguishedName).ToArray();
         int pages = Math.Max(1, (matches.Length + PageSize - 1) / PageSize);
         page = Math.Clamp(page, 1, pages);

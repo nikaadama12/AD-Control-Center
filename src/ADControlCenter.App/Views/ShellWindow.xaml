@@ -3,6 +3,9 @@
     <BooleanToVisibilityConverter x:Key="VisibleWhen" />
     <DataTemplate DataType="{x:Type p:ConnectionPage}"><v:ConnectionView /></DataTemplate>
     <DataTemplate DataType="{x:Type p:LiveRecordsPage}"><v:LiveRecordsView /></DataTemplate>
+    <DataTemplate DataType="{x:Type p:OnboardingPage}"><v:OnboardingView/></DataTemplate>
+    <DataTemplate DataType="{x:Type p:AccountAdminPage}"><v:AccountAdminView/></DataTemplate>
+    <DataTemplate DataType="{x:Type p:AdminHistoryPage}"><v:AdminHistoryView/></DataTemplate>
     <v:SameValue x:Key="Same" />
     <DataTemplate DataType="{x:Type p:DashboardPage}">
       <v:DashboardView />
@@ -40,10 +43,10 @@
             </Style.Triggers>
           </Style>
         </Button.Style>
-        <StackPanel Orientation="Horizontal">
-          <v:Icon Kind="{Binding Icon}" Ink="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="18" Height="18" />
-          <TextBlock Margin="12,0,0,0" Text="{Binding Name}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-        </StackPanel>
+        <DockPanel>
+          <v:Icon DockPanel.Dock="Left" Kind="{Binding Icon}" Ink="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="18" Height="18" />
+          <TextBlock Margin="12,0,0,0" TextWrapping="Wrap" Text="{Binding Name}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+        </DockPanel>
       </Button>
     </DataTemplate>
   </Window.Resources>
@@ -106,10 +109,11 @@
       <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource Line}" Padding="24,0">
         <DockPanel>
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-            <Border Background="{DynamicResource Tint}" CornerRadius="4" Padding="8,4">
+            <Border CornerRadius="4" Padding="8,4"><Border.Style><Style TargetType="Border"><Setter Property="Background" Value="{DynamicResource Tint}"/>
+<Style.Triggers><DataTrigger Binding="{Binding IsAdministration}" Value="True"><Setter Property="Background" Value="#8A3026"/></DataTrigger></Style.Triggers></Style></Border.Style>
               <StackPanel Orientation="Horizontal">
                 <Ellipse Width="6" Height="6" Fill="{DynamicResource AccentText}" Margin="0,0,6,0" />
-                <TextBlock Text="{Binding ModeLabel}" FontSize="10" FontFamily="Consolas" FontWeight="Bold" Foreground="{DynamicResource AccentText}" />
+                <TextBlock Text="{Binding ModeLabel}" FontSize="10" FontFamily="Consolas" FontWeight="Bold"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource AccentText}"/><Style.Triggers><DataTrigger Binding="{Binding IsAdministration}" Value="True"><Setter Property="Foreground" Value="White"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
               </StackPanel>
             </Border>
           </StackPanel>
@@ -137,11 +141,19 @@
           </StackPanel>
         </Button>
       </Grid>
-      <ContentControl Grid.Row="2" Content="{Binding Page}" Margin="24,0,24,14" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
+      <ContentControl Grid.Row="2" Content="{Binding Page}" Margin="24,0,24,14" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+        <ContentControl.Style>
+          <Style TargetType="ContentControl">
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding Busy}" Value="True"><Setter Property="IsEnabled" Value="False"/></DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </ContentControl.Style>
+      </ContentControl>
       <Border Grid.Row="3" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource Line}" Padding="16,0">
         <DockPanel>
           <ProgressBar DockPanel.Dock="Right" Width="80" Height="4" Margin="8,0" IsIndeterminate="True" Visibility="{Binding Busy,Converter={StaticResource VisibleWhen}}"/>
-          <TextBlock DockPanel.Dock="Right" Text="v1.1.1" Style="{StaticResource Tiny}" />
+          <TextBlock DockPanel.Dock="Right" Text="v1.2.0" Style="{StaticResource Tiny}" />
           <Ellipse DockPanel.Dock="Left" Fill="{DynamicResource AccentText}" Width="6" Height="6" Margin="0,0,7,0" />
           <TextBlock Text="{Binding Status}" Style="{StaticResource Tiny}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Status}" />
         </DockPanel>

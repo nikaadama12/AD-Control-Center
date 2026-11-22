@@ -33,7 +33,9 @@ For Kerberos, verify `Resolve-DnsName _kerberos._tcp.ad.lab.test -Type SRV`, `Te
 
 The viewer displays direct `member` and `memberOf` links. It does not calculate nested effective authorization or infer primary-group membership. Computer last logon uses the replicated `lastLogonTimestamp` where present. Hidden and unavailable attributes can be empty.
 
-## Manual lab acceptance
+For separately authorized administration tests, follow the [delegation guide](delegated-administration.md) and [onboarding acceptance procedure](onboarding.md). Disconnecting discards the inventory and session events. Previously written administration journal entries remain on disk.
+
+## Manual read-only lab acceptance
 
 | Check | Expected observation |
 | --- | --- |

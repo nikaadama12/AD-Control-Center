@@ -34,6 +34,10 @@ function Wait-For([scriptblock]$Check, [string]$Description) {
         if ($value) { return $value }
         Start-Sleep -Milliseconds 100
     } while ([DateTime]::UtcNow -lt $limit)
+    if ($window) {
+        $buttons = $window.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty,[Windows.Automation.ControlType]::Button))
+        Write-Verbose ("Available buttons: " + (($buttons | ForEach-Object { $_.Current.Name }) -join ', ')) -Verbose
+    }
     throw "Timed out waiting for $Description"
 }
 function Find-Element($Root, [string]$Name, $Type) {
@@ -238,7 +242,42 @@ try {
     Wait-Text $window 'Sample directory restored'
     Click-Button $window 'Users'
     Wait-Text $window '128 records'
-    'Desktop smoke test passed: Connection Manager validation and all demo screens, search and filters, account actions, membership editing, CSV preview and apply, report export, themes, cancellation, clear and restore.'
+    Click-Button $window 'Onboarding'
+    Wait-Text $window 'Employee information'
+    Set-Field $window 'First name' 'River'
+    Set-Field $window 'Last name' 'Fixture'
+    Set-Field $window 'Display name' 'River Fixture'
+    Set-Field $window 'Username' 'river.fixture'
+    Set-Field $window 'User principal name' 'river.fixture@northstar.example'
+    Set-Field $window 'Department' 'IT'
+    Set-Field $window 'Job title' 'Analyst'
+    Click-Button $window 'Next'
+    Choose-Option $window 'Destination OU' 'Engineering'
+    Click-Button $window 'Next'
+    Click-Button $window 'Apply department template'
+    Wait-Text $window 'IT department template'
+    Click-Button $window 'Next'
+    Set-Field $window 'Temporary password' ([Guid]::NewGuid().ToString('N'))
+    Click-Button $window 'Next'
+    Wait-Text $window 'Review and confirm'
+    Snapshot 'onboarding'
+    Click-Button $window 'Review and create…'
+    Confirm-Action $window 'Create demo account?' 'Confirm creation'
+    Wait-Text $window 'Results'
+    Click-Button $window 'Open account details'
+    Confirm-Action $window 'Account details' 'Close'
+    Click-Button $window 'Account administration'
+    Set-Field $window 'Find disposable account' 'river.fixture'
+    Choose-Option $window 'Disposable account' 'River Fixture (river.fixture)'
+    Set-Field $window 'Job title' 'Systems Analyst'
+    Click-Button $window 'Review and apply…'
+    Confirm-Action $window 'Apply demo changes?' 'Apply changes'
+    Wait-Text $window 'EditAttributes · Success · Acknowledged.'
+    Click-Button $window 'Administration history'
+    Wait-Text $window 'Application-initiated operations · UTC'
+    $audit = Get-Content -LiteralPath (Join-Path $testData 'demo-administration.jsonl') -Encoding UTF8 | ForEach-Object { $_ | ConvertFrom-Json }
+    if (@($audit | Where-Object { $_.Outcome -eq 'Success' }).Count -ne 5) { throw 'Onboarding or edit acknowledgement missing.' }
+    'Desktop smoke test passed: existing demo workflows, six onboarding steps, template membership, account details, confirmed attribute editing and administrative history.'
 } finally {
     if ($previousDpi -ne [IntPtr]::Zero) { [void][DemoCapture]::SetThreadDpiAwarenessContext($previousDpi) }
     $env:ADCC_DEMO_HOME = $previousFolder

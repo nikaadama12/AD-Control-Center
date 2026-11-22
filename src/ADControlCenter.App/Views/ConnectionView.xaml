@@ -14,7 +14,9 @@
         <WrapPanel Margin="0,16,0,0"><Button Content="Test connection" Click="TestClick" Margin="0,0,8,0"/><Button Style="{StaticResource Primary}" Content="Connect read-only" Click="ConnectClick"/></WrapPanel>
       </StackPanel>
       <TextBlock Text="{Binding DataContext.Status, RelativeSource={RelativeSource AncestorType=Window}}" Style="{StaticResource Caption}" Margin="0,14,0,8" TextWrapping="Wrap"/>
-      <Button Content="Disconnect" HorizontalAlignment="Left" Command="{Binding DataContext.Run,RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="Disconnect"/>
+      <WrapPanel><Button Content="Enable live administration…" Command="{Binding DataContext.Run,RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="EnableAdministration" Margin="0,0,8,0"/>
+      <Button Content="Return to read-only" Command="{Binding DataContext.Run,RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="EndAdministration" Margin="0,0,8,0"/>
+      <Button Content="Disconnect" HorizontalAlignment="Left" Command="{Binding DataContext.Run,RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="Disconnect"/></WrapPanel>
     </StackPanel></Border>
   </StackPanel></ScrollViewer>
 </UserControl>

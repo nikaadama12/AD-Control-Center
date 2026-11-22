@@ -1,0 +1,20 @@
+<UserControl x:Class="ADControlCenter.App.Views.AdminHistoryView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:v="clr-namespace:ADControlCenter.App.Views">
+  <Border Style="{StaticResource Card}">
+    <DockPanel>
+      <TextBlock DockPanel.Dock="Top" Text="Application-initiated operations · UTC" Style="{StaticResource Heading}" Margin="0,0,0,10" />
+      <TextBox DockPanel.Dock="Bottom" Text="{Binding SelectedItem.Details,ElementName=Events,Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" Margin="0,8,0,0" />
+      <DataGrid x:Name="Events" ItemsSource="{Binding Entries}" HorizontalScrollBarVisibility="Auto">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="UTC" Binding="{Binding Utc}" Width="155" />
+          <DataGridTextColumn Header="Actor" Binding="{Binding Actor}" Width="115" />
+          <DataGridTextColumn Header="Operation" Binding="{Binding Operation}" Width="140" />
+          <DataGridTextColumn Header="Target" Binding="{Binding Target}" Width="210" />
+          <DataGridTextColumn Header="Outcome" Binding="{Binding Outcome}" Width="105" />
+          <DataGridTextColumn Header="Before" Binding="{Binding Before}" Width="280" />
+          <DataGridTextColumn Header="After (requested)" Binding="{Binding After}" Width="280" />
+          <DataGridTextColumn Header="Operation ID" Binding="{Binding OperationId}" Width="240" />
+        </DataGrid.Columns>
+      </DataGrid>
+    </DockPanel>
+  </Border>
+</UserControl>

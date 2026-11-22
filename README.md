@@ -1,6 +1,6 @@
 # AD Control Center
 
-A Windows desktop portfolio project for practicing directory administration. Version 1.1.1 starts in **DEMO MODE** and adds an optional **LIVE READ-ONLY MODE** for Active Directory. The demo opens a fictional **northstar.example** workspace with **128 users, 84 computers, and 12 security groups**. Explore account health, review stale devices, simulate support tasks, and export the results from a standard Windows user session.
+AD Control Center **1.2.0** is a Windows desktop portfolio project for practicing directory administration. It starts in **DEMO MODE**. A live connection opens in **LIVE READ-ONLY MODE**. A delegated operator can explicitly enable **LIVE ADMINISTRATION MODE** for the isolated AppTesting lab. The demo opens a fictional **northstar.example** workspace with **128 users, 84 computers, and 12 security groups**. Explore account health, review stale devices, simulate support tasks, and export the results from a standard Windows user session.
 
 ![AD Control Center dashboard showing the sample directory and its account health](docs/screenshots/dashboard.png)
 
@@ -26,9 +26,19 @@ dotnet publish src/ADControlCenter.App -c Release -r win-x64 --self-contained tr
 
 Open **Connection Manager**, enter the controller FQDN and select **LDAPS** or **Kerberos**. Enter your domain UPN and password in the application. **Test connection** verifies the bind and reads RootDSE. Re-enter the password and choose **Connect read-only** to load the dashboard. A visible mode badge identifies the active provider.
 
-Live mode reads users, groups, computers and the OU hierarchy. Refresh queries the controller again. Directory writes are disabled. Live inventory, credentials and session events stay in memory. A confirmed CSV or HTML export is the explicit path to disk. **Disconnect** restores the existing demo workspace.
+Live Read-Only Mode displays users, groups, computers and the OU hierarchy. **Refresh** queries the controller again. Live inventory and credentials stay in memory. Confirmed reports go to the private export directory. Live Administration Mode also keeps a private operation journal. **Disconnect** restores your demo workspace.
 
-[Lab DNS, transport requirements and step-by-step acceptance checks](docs/live-lab.md) · [Changelog](CHANGELOG.md) · [v1.1.1 release notes](docs/release-v1.1.1.md)
+## Onboard an employee
+
+Launch the application and select **Onboarding** to try the entire workflow offline. Enter a fictional identity, choose an OU, apply a department template, set initial account options and review the proposed changes. The results show each acknowledged step. **Account administration** lets you edit attributes or compare current and proposed direct group memberships. **Administration history** records the operator and outcomes.
+
+![Reviewing a fictional employee and their proposed memberships in Demo Mode](docs/screenshots/onboarding.png)
+
+For live use, install the machine-owned policy and delegate rights on the disposable lab objects first. Connect to `DC01.ad.lab.test`, then select **Connection Manager → Enable live administration…**. The red badge marks the write-capable session. **Return to read-only** revokes it. Each new connection starts read-only.
+
+[Onboarding guide](docs/onboarding.md) · [Delegated permissions and policy](docs/delegated-administration.md)
+
+[Lab DNS, transport requirements and step-by-step acceptance checks](docs/live-lab.md) · [Changelog](CHANGELOG.md) · [v1.2.0 release notes](docs/release-v1.2.md)
 
 ## Export a privacy-safe summary
 
@@ -72,7 +82,7 @@ Detailed exports are available for **User accounts**, **Security groups**, **Com
 
 ## Data and simulation boundaries
 
-- Demo administration uses fictional records and the **Demo Operator** identity. Only Connection Manager accepts lab credentials.
+- Demo administration uses fictional records and the **Demo Operator** identity. Connection Manager accepts the operator credential. The onboarding wizard accepts the new employee’s temporary password separately.
 - A simulated password reset records its timestamp. Demo accounts contain no password value.
 - The default workspace lives at `%LOCALAPPDATA%\AD Control Center\directory.json`. The initial export folder is its sibling directory `Exports`. Reports are ordinary files and remain available after a directory reset.
 - `ADCC_DEMO_HOME` can point to a different local workspace for isolated demonstrations and tests. Each workspace permits one running application instance.
@@ -80,7 +90,7 @@ Detailed exports are available for **User accounts**, **Security groups**, **Com
 
 ## Architecture and tests
 
-The WPF shell uses MVVM and explicit constructor injection. `IDirectoryService` defines directory operations, `IDemoWorkspace` owns workspace settings and maintenance, and `DemoDirectoryService` implements both over an atomic local JSON store. Views use typed page models and commands. Native dialogs are behind `IInteraction`. The live `ILiveReader` contract exposes reads and disposal. Its LDAP implementation uses `System.DirectoryServices.Protocols` and executes directory queries on a worker thread.
+The WPF shell uses MVVM and explicit constructor injection. `IDirectoryService` defines directory operations, `IDemoWorkspace` owns workspace settings and maintenance, and `DemoDirectoryService` implements both over an atomic local JSON store. Views use typed page models and commands. Native dialogs are behind `IInteraction`. The live `ILiveReader` contract exposes reads and disposal. A separate per-connection `IAdminBackend` implements scoped writes through the shared `AdminWorkflow`. Its LDAP implementation uses `System.DirectoryServices.Protocols` and executes directory queries on a worker thread.
 
 ```powershell
 dotnet test ADControlCenter.sln -c Release

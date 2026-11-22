@@ -1,6 +1,7 @@
 using System.Windows.Input;
 using ADControlCenter.Core;
 using ADControlCenter.Core.Live;
+using ADControlCenter.Core.Admin;
 
 namespace ADControlCenter.App.Presentation;
 
@@ -17,10 +18,16 @@ public sealed partial class ShellViewModel : Bindable
         new("Groups","Groups"), new("Bulk Operations","Bulk"), new("Reports","Reports"), new("Audit Logs","Audit")];
     public NavItem SettingsNav { get; } = new("Settings", "Settings");
     public NavItem Current { get => _current; private set { Set(ref _current, value); Changed(nameof(Title)); Changed(nameof(Subtitle)); } }
-    public object Page { get => _page; private set => Set(ref _page, value); }
+    public object Page { get => _page; private set { if (_page is IDisposable disposable) disposable.Dispose(); Set(ref _page, value); } }
     public string Status { get => _status; private set => Set(ref _status, value); }
     public string Title => Current.Name switch { "Dashboard" => "Directory overview", "Bulk Operations" => "Bulk operations", "Audit Logs" => "Audit logs", _ => Current.Name };
-    public string Subtitle => Current.Name == "Connection Manager" ? "Test authentication and manage your protected directory session." : IsLive ? $"Read-only directory snapshot · {_loaded:g}" : Current.Name switch
+    public string Subtitle => Current.Name switch {
+        "Onboarding" => "Create an employee account with a reviewed OU, memberships and initial settings.",
+        "Account administration" => "Review supported attributes, account state and direct group membership.",
+        "Administration history" => "Application activity with before and requested after values. Independent of AD security auditing.",
+        _ => DefaultSubtitle
+    };
+    private string DefaultSubtitle => Current.Name == "Connection Manager" ? "Test authentication and manage your protected directory session." : IsLive ?  $"{ModeLabel} · {_loaded:g}" : Current.Name switch
     {
         "Dashboard" => "Account health and activity across your local directory.",
         "Users" => "Manage fictional user accounts and simulate account operations.",
@@ -39,6 +46,7 @@ public sealed partial class ShellViewModel : Bindable
         PrivateExports = liveExportFolder ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AD Control Center", "LiveExports");
         _live = new(connector);
         _directory = directory;
+        if (directory is DemoDirectoryService demo) _demoAdmin=new(demo,new FileAdminAudit(demo.DemoAuditPath));
         _workspace = workspace;
         _ui = ui;
         _current = DemoNavigation[0];
@@ -61,7 +69,7 @@ public sealed partial class ShellViewModel : Bindable
     }
     private void Open(string name)
     {
-        if (Busy || IsLive && !LiveNavigation.Any(n => n.Name == name)) return;
+        if (Busy || IsLive && !Navigation.Any(n => n.Name == name)) return;
         string? filter = name == "Stale" ? "Stale" : null;
         if (filter != null) name = "Computers";
         Current = Navigation.Append(SettingsNav).First(n => n.Name == name);
@@ -72,6 +80,16 @@ public sealed partial class ShellViewModel : Bindable
 
     private void Load(bool preserve = false, string? filter = null)
     {
+        if (ActiveWorkflow is { } workflow)
+        {
+            object? page=Current.Name switch {
+                "Onboarding"=>new OnboardingPage(workflow,IsLive,_ui,RunAdminAsync),
+                "Account administration"=>new AccountAdminPage(workflow,IsLive,_ui,RunAdminAsync),
+                "Administration history"=>new AdminHistoryPage(workflow.History()),
+                _=>null
+            };
+            if(page!=null){Page=page;return;}
+        }
         if (IsLive) { LoadLive(); return; }
         var d = _directory.GetInventory();
         Page = Current.Name switch
@@ -93,10 +111,12 @@ public sealed partial class ShellViewModel : Bindable
     private bool Available(string? action) => !Busy && (IsLive ? action switch
     {
         "Refresh" or "Disconnect" => true,
+        "EnableAdministration" => !IsAdministration && Page is ConnectionPage,
+        "EndAdministration" => IsAdministration && Page is ConnectionPage,
         "Export" => Page is ReportsPage,
         "View" => Page is LiveRecordsPage { Selected: not null } || Selected != null,
         _ => false
-    } : action != "Disconnect" && action switch
+    } : action is not ("Disconnect" or "EnableAdministration" or "EndAdministration") && action switch
     {
         "View" or "Edit" => Selected != null,
         "Enable" => Selected is DirectoryUser { Enabled: false },

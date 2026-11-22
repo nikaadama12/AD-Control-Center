@@ -17,6 +17,10 @@ Exports/
 LiveExports/
 live-*.csv
 live-*.html
+administration.json
+audit.jsonl
+demo-administration.jsonl
+demo-templates.json
 # Editor and OS files
 .idea/
 Thumbs.db

@@ -1,0 +1,119 @@
+<UserControl x:Class="ADControlCenter.App.Views.OnboardingView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:v="clr-namespace:ADControlCenter.App.Views">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <Border Style="{StaticResource Card}">
+      <StackPanel>
+        <TextBlock Text="{Binding StepLabel}" Style="{StaticResource Tiny}" />
+        <ProgressBar Height="3" Width="170" Maximum="6" Value="{Binding Stage,Mode=OneWay}" HorizontalAlignment="Left" Margin="0,7,0,5" AutomationProperties.Name="Onboarding progress" />
+        <TextBlock Text="{Binding Heading}" Style="{StaticResource Heading}" Margin="0,6,0,16" />
+        <StackPanel>
+          <StackPanel.Style>
+            <Style TargetType="StackPanel">
+              <Setter Property="Visibility" Value="Collapsed" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding Stage}" Value="1">
+                  <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </StackPanel.Style>
+          <v:EmployeeFields DataContext="{Binding Form}" />
+        </StackPanel>
+        <StackPanel>
+          <StackPanel.Style>
+            <Style TargetType="StackPanel">
+              <Setter Property="Visibility" Value="Collapsed" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding Stage}" Value="2">
+                  <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </StackPanel.Style>
+          <TextBlock Text="Approved destination" Margin="0,0,0,6" />
+          <ComboBox ItemsSource="{Binding Locations}" SelectedItem="{Binding Location}" AutomationProperties.Name="Destination OU" />
+        </StackPanel>
+        <StackPanel>
+          <StackPanel.Style>
+            <Style TargetType="StackPanel">
+              <Setter Property="Visibility" Value="Collapsed" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding Stage}" Value="3">
+                  <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </StackPanel.Style>
+          <Button Content="Apply department template" Command="{Binding Template}" Margin="0,0,8,0" HorizontalAlignment="Left" />
+          <ItemsControl ItemsSource="{Binding Groups}" Margin="0,10">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <DockPanel Margin="0,4">
+                  <TextBlock DockPanel.Dock="Right" Text="{Binding Reason}" Style="{StaticResource Caption}" />
+                  <CheckBox Content="{Binding Group.Name}" IsChecked="{Binding Selected}" Foreground="{DynamicResource Text}" />
+                </DockPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+        <StackPanel>
+          <StackPanel.Style>
+            <Style TargetType="StackPanel">
+              <Setter Property="Visibility" Value="Collapsed" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding Stage}" Value="4">
+                  <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </StackPanel.Style>
+          <TextBlock Text="Temporary password" Margin="0,0,0,6" />
+          <PasswordBox x:Name="Secret" MaxLength="256" PasswordChanged="PasswordChanged" AutomationProperties.Name="Temporary password" Background="{DynamicResource Field}" Foreground="{DynamicResource Text}" Padding="8" BorderBrush="{DynamicResource Line}" />
+          <CheckBox Content="Require password change at next logon" IsChecked="{Binding ChangeAtLogon}" Foreground="{DynamicResource Text}" Margin="0,14,0,6" />
+          <CheckBox Content="Enable account after setup completes" IsChecked="{Binding Enabled}" Foreground="{DynamicResource Text}" />
+        </StackPanel>
+        <StackPanel>
+          <StackPanel.Style>
+            <Style TargetType="StackPanel">
+              <Setter Property="Visibility" Value="Collapsed" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding Stage}" Value="5">
+                  <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </StackPanel.Style>
+          <TextBlock Text="{Binding ModeNotice}" FontWeight="SemiBold" Foreground="{DynamicResource Danger}" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding Review}" LineHeight="22" Margin="0,12" TextWrapping="Wrap" />
+          <Button Content="Review and create…" Command="{Binding Apply}" Margin="0,0,8,0" HorizontalAlignment="Left" Style="{StaticResource Primary}" />
+        </StackPanel>
+        <StackPanel>
+          <StackPanel.Style>
+            <Style TargetType="StackPanel">
+              <Setter Property="Visibility" Value="Collapsed" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding Stage}" Value="6">
+                  <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </StackPanel.Style>
+          <DataGrid ItemsSource="{Binding Result.Steps}" MaxHeight="200">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Operation" Binding="{Binding Operation}" Width="*" />
+              <DataGridTextColumn Header="Target" Binding="{Binding Target}" Width="1.5*" />
+              <DataGridTextColumn Header="Outcome" Binding="{Binding Outcome}" Width="*" />
+            </DataGrid.Columns>
+          </DataGrid>
+          <TextBlock Text="Sanitized summary" Margin="0,14,0,4" />
+          <TextBox IsReadOnly="True" Text="{Binding Result.Summary,Mode=OneWay}" TextWrapping="Wrap" MaxHeight="210" VerticalScrollBarVisibility="Auto" />
+          <Button Content="Open account details" Command="{Binding Details}" Margin="0,12,0,0" HorizontalAlignment="Left" />
+        </StackPanel>
+        <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Danger}" TextWrapping="Wrap" Margin="0,8" />
+        <StackPanel Orientation="Horizontal">
+          <Button Content="Back" Command="{Binding Back}" Margin="0,0,8,0" />
+          <Button Content="Next" Command="{Binding Next}" Margin="0,0,8,0" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+  </ScrollViewer>
+</UserControl>
