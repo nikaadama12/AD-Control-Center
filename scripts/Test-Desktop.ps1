@@ -92,6 +92,11 @@ try {
     $window = [Windows.Automation.AutomationElement]::FromHandle($handle)
     Wait-Text $window 'Directory overview'
     Snapshot 'dashboard'
+    Click-Button $window 'Connection Manager'
+    Wait-Text $window 'Secure directory connection'
+    Click-Button $window 'Test connection'
+    Wait-Text $window 'Enter a domain UPN and password.'
+    Wait-Text $window 'DEMO MODE'
     Click-Button $window 'Users'
     Wait-Text $window '128 records'
     Set-Field $window 'Search records' 'avery.vale'
@@ -220,7 +225,7 @@ try {
     Wait-Text $window 'Sample directory restored'
     Click-Button $window 'Users'
     Wait-Text $window '128 records'
-    'Desktop smoke test passed: all eight screens, search and filters, account actions, membership editing, CSV preview and apply, report export, themes, cancellation, clear and restore.'
+    'Desktop smoke test passed: Connection Manager validation and all demo screens, search and filters, account actions, membership editing, CSV preview and apply, report export, themes, cancellation, clear and restore.'
 } finally {
     if ($previousDpi -ne [IntPtr]::Zero) { [void][DemoCapture]::SetThreadDpiAwarenessContext($previousDpi) }
     $env:ADCC_DEMO_HOME = $previousFolder

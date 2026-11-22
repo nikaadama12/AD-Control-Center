@@ -118,7 +118,7 @@ internal sealed class FormWindow : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner; ShowInTaskbar = false;
         var layout = new DockPanel { Margin = new(22) };
         var head = new StackPanel { Margin = new(0, 0, 0, 14) };
-        var badge = new TextBlock { Text = "DEMO WORKSPACE", FontFamily = new("Consolas"), FontSize = 11 };
+        var badge = new TextBlock { Text = Application.Current.MainWindow?.DataContext is ShellViewModel shell ? shell.ModeLabel : "DEMO MODE", FontFamily = new("Consolas"), FontSize = 11 };
         badge.SetResourceReference(TextBlock.ForegroundProperty, "AccentText");
         head.Children.Add(badge);
         head.Children.Add(new TextBlock { Text = title, FontSize = 22, FontWeight = FontWeights.SemiBold, Margin = new(0, 4, 0, 0), TextWrapping = TextWrapping.Wrap });

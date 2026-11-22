@@ -2,6 +2,7 @@ using System.Collections;
 using System.Windows.Data;
 using System.ComponentModel;
 using ADControlCenter.Core;
+using ADControlCenter.Core.Live;
 
 namespace ADControlCenter.App.Presentation;
 
@@ -18,6 +19,26 @@ public sealed class DashboardPage
     public IReadOnlyList<HealthItem> Health { get; }
     public IReadOnlyList<AuditEntry> Recent { get; }
     public int Total { get; }
+    public string DistributionTitle { get; } = "Users by organizational unit";
+    public string DistributionCaption { get; } = "Account distribution · Top 6 units";
+    public DashboardPage(IReadOnlyList<LiveObject> snapshot, IReadOnlyList<AuditEntry> events)
+    {
+        DistributionTitle = "Users by parent location";
+        DistributionCaption = "Account distribution · Top 6 containers";
+        var users = snapshot.Where(o => o.Kind == ObjectKind.Users).ToArray();
+        Total = users.Length;
+        var units = users.GroupBy(o => o.Parent, StringComparer.OrdinalIgnoreCase).OrderByDescending(g => g.Count()).Take(6).ToArray();
+        Units = units.Select(g => new UnitBar(g.Key, g.Count(), (double)g.Count() / units[0].Count())).ToArray();
+        Health = new[] { ("Enabled", "#B9F481"), ("Disabled", "#7B95AF"), ("Locked", "#EFBC77"), ("Unknown", "#B8A3FA") }
+            .Select(s => new HealthItem(s.Item1, users.Count(u => u.Status == s.Item1), s.Item2)).Where(h => h.Count > 0).ToArray();
+        Metrics = [
+            new("Directory users", Total.ToString("N0"), "Visible user accounts", "Users", "#B9F481", "Users"),
+            new("Computers", Count(ObjectKind.Computers), "Visible devices", "Computers", "#83BBFF", "Computers"),
+            new("Groups", Count(ObjectKind.Groups), "Visible directory groups", "Groups", "#B8A3FA", "Groups"),
+            new("Organizational units", Count(ObjectKind.OrganizationalUnits), "Visible hierarchy", "Directory", "#F0BC73", "Organizational Units")];
+        Recent = events.Take(5).ToArray();
+        string Count(ObjectKind kind) => snapshot.Count(o => o.Kind == kind).ToString("N0");
+    }
     public DashboardPage(DirectoryInventory data, IReadOnlyList<AuditEntry> audit)
     {
         Total = data.Users.Count;
@@ -159,7 +180,7 @@ public sealed class ReportsPage : Bindable
     public ReportChoice Selected { get => _selected; set => Set(ref _selected, value); }
     public ReportFormat Format { get; set; }
     public string Folder { get; }
-    public ReportsPage(string folder) { Folder = folder; _selected = Choices[0]; }
+    public ReportsPage(string folder, bool live = false) { Folder = folder; _selected = Choices[0]; if (live) Formats = [ReportFormat.Csv, ReportFormat.Html]; }
 }
 
 public sealed class SettingsPage(Preferences prefs) : Bindable

@@ -14,6 +14,9 @@ directory.json
 directory.json.tmp
 workspace.lock
 Exports/
+LiveExports/
+live-*.csv
+live-*.html
 # Editor and OS files
 .idea/
 Thumbs.db

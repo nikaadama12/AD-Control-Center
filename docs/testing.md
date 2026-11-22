@@ -14,6 +14,12 @@ MSTest creates a unique temporary workspace for each case. The suite covers samp
 
 The Windows GitHub Actions workflow builds and runs the core suite on pushes and pull requests. The desktop smoke test needs a logged-in interactive session.
 
+## Live-mode automated tests
+
+The Windows test project injects a mock authenticated reader into the session and WPF shell. Cases cover mode switching, direct invocation of disabled writes, privacy confirmation, paging/filtering, failure rollback, session disposal and export encoding. Certificate tests use ephemeral test certificates and process-local trust chains. The tests do not require a domain, credentials or changes to Windows trust stores.
+
+Use the [lab acceptance checklist](live-lab.md) to verify real binds, trust, object visibility, memberships and controller-specific behavior.
+
 ## Desktop smoke test
 
 Close any prior smoke-test file picker and run the script in a Windows PowerShell session after building Release.

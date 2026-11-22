@@ -1,5 +1,6 @@
 using System.Windows;
 using ADControlCenter.Core;
+using ADControlCenter.Core.Live;
 using ADControlCenter.App.Presentation;
 using ADControlCenter.App.Views;
 
@@ -8,6 +9,7 @@ namespace ADControlCenter.App;
 public partial class App : Application
 {
     private DemoDirectoryService? _provider;
+    private ShellViewModel? _shell;
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -18,7 +20,7 @@ public partial class App : Application
             _provider = new DemoDirectoryService(folder);
             var ui = new Interaction();
             ui.ApplyTheme(_provider.Settings.Theme);
-            var shell = new ShellViewModel(_provider, _provider, ui);
+            var shell = _shell = new ShellViewModel(_provider, _provider, ui, new LdapConnector());
             MainWindow = new ShellWindow { DataContext = shell };
             MainWindow.Show();
         }
@@ -30,6 +32,7 @@ public partial class App : Application
     }
     protected override void OnExit(ExitEventArgs e)
     {
+        _shell?.CloseSession();
         try
         {
             if (e.ApplicationExitCode == 0)

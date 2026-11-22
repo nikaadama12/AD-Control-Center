@@ -1,6 +1,6 @@
 # AD Control Center
 
-A Windows desktop portfolio project for practicing directory administration. Version 1.0 opens a fictional **northstar.example** workspace with **128 users, 84 computers, and 12 security groups**. Explore account health, review stale devices, simulate support tasks, and export the results from a standard Windows user session.
+A Windows desktop portfolio project for practicing directory administration. Version 1.1 starts in **DEMO MODE** and adds an optional **LIVE READ-ONLY MODE** for Active Directory. The demo opens a fictional **northstar.example** workspace with **128 users, 84 computers, and 12 security groups**. Explore account health, review stale devices, simulate support tasks, and export the results from a standard Windows user session.
 
 ![AD Control Center dashboard showing the sample directory and its account health](docs/screenshots/dashboard.png)
 
@@ -14,7 +14,7 @@ dotnet build ADControlCenter.sln -c Release --no-restore
 dotnet run --project src/ADControlCenter.App -c Release --no-build
 ```
 
-The first launch creates the sample directory. Subsequent launches reopen your saved workspace. The application runs offline after build or publication. NuGet access is needed for the first test-package restore.
+The first launch creates the sample directory. Subsequent launches reopen your saved workspace. Demo Mode runs offline after build or publication. The initial build restores NuGet dependencies.
 
 To produce a self-contained Windows x64 executable with the desktop runtime included, run the following command. Launch `artifacts\win-x64\ADControlCenter.exe` as your usual Windows user.
 
@@ -22,7 +22,15 @@ To produce a self-contained Windows x64 executable with the desktop runtime incl
 dotnet publish src/ADControlCenter.App -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=None -o artifacts/win-x64
 ```
 
-## Explore the workspace
+## Connect to a live directory
+
+Open **Connection Manager**, enter the controller FQDN and select **LDAPS** or **Kerberos**. Enter your domain UPN and password in the application. **Test connection** verifies the bind and reads RootDSE. Re-enter the password and choose **Connect read-only** to load the dashboard. A visible mode badge identifies the active provider.
+
+Live mode reads users, groups, computers and the OU hierarchy. Refresh queries the controller again. Directory writes are disabled. Live inventory, credentials and session events stay in memory. A confirmed CSV or HTML export is the explicit path to disk. **Disconnect** restores the existing demo workspace.
+
+[Lab DNS, transport requirements and step-by-step acceptance checks](docs/live-lab.md) · [Changelog](CHANGELOG.md) · [GitHub release procedure](docs/release-v1.1.md)
+
+## Explore the demo workspace
 
 | Screen | Tasks |
 | --- | --- |
@@ -47,15 +55,15 @@ dotnet publish src/ADControlCenter.App -c Release -r win-x64 --self-contained tr
 
 ## Data and simulation boundaries
 
-- All account and security operations act on fictional local records. The application uses a fixed **Demo Operator** identity. It never asks for credentials or invokes a domain API.
-- A simulated password reset records its timestamp. The application has no password input, generator or password value to store.
+- Demo administration uses fictional records and the **Demo Operator** identity. Only Connection Manager accepts lab credentials.
+- A simulated password reset records its timestamp. Demo accounts contain no password value.
 - The default workspace lives at `%LOCALAPPDATA%\AD Control Center\directory.json`. The initial export folder is its sibling directory `Exports`. Reports are ordinary files and remain available after a directory reset.
 - `ADCC_DEMO_HOME` can point to a different local workspace for isolated demonstrations and tests. Each workspace permits one running application instance.
 - Audit entries use UTC timestamps with local-time display. Seeded example activities identify themselves in the details. The audit trail is a local learning tool and is editable by the owner of the JSON file.
 
 ## Architecture and tests
 
-The WPF shell uses MVVM and explicit constructor injection. `IDirectoryService` defines directory operations, `IDemoWorkspace` owns workspace settings and maintenance, and `DemoDirectoryService` implements both over an atomic local JSON store. Views use typed page models and commands. Native dialogs are behind `IInteraction`.
+The WPF shell uses MVVM and explicit constructor injection. `IDirectoryService` defines directory operations, `IDemoWorkspace` owns workspace settings and maintenance, and `DemoDirectoryService` implements both over an atomic local JSON store. Views use typed page models and commands. Native dialogs are behind `IInteraction`. The live `ILiveReader` contract exposes reads and disposal. Its LDAP implementation uses `System.DirectoryServices.Protocols` and executes directory queries on a worker thread.
 
 ```powershell
 dotnet test ADControlCenter.sln -c Release

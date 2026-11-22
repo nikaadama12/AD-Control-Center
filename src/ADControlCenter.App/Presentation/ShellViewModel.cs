@@ -1,9 +1,10 @@
 using System.Windows.Input;
 using ADControlCenter.Core;
+using ADControlCenter.Core.Live;
 
 namespace ADControlCenter.App.Presentation;
 
-public sealed class ShellViewModel : Bindable
+public sealed partial class ShellViewModel : Bindable
 {
     private readonly IDirectoryService _directory;
     private readonly IDemoWorkspace _workspace;
@@ -12,14 +13,14 @@ public sealed class ShellViewModel : Bindable
     private object _page;
     private string _status = "Workspace ready";
     private ImportPreview? _preview;
-    public NavItem[] Navigation { get; } = [new("Dashboard","Dashboard"), new("Users","Users"), new("Computers","Computers"),
+    private NavItem[] DemoNavigation { get; } = [new("Dashboard","Dashboard"), new("Users","Users"), new("Computers","Computers"),
         new("Groups","Groups"), new("Bulk Operations","Bulk"), new("Reports","Reports"), new("Audit Logs","Audit")];
     public NavItem SettingsNav { get; } = new("Settings", "Settings");
     public NavItem Current { get => _current; private set { Set(ref _current, value); Changed(nameof(Title)); Changed(nameof(Subtitle)); } }
     public object Page { get => _page; private set => Set(ref _page, value); }
     public string Status { get => _status; private set => Set(ref _status, value); }
     public string Title => Current.Name switch { "Dashboard" => "Directory overview", "Bulk Operations" => "Bulk operations", "Audit Logs" => "Audit logs", _ => Current.Name };
-    public string Subtitle => Current.Name switch
+    public string Subtitle => Current.Name == "Connection Manager" ? "Test authentication and manage your protected directory session." : IsLive ? $"Read-only directory snapshot · {_loaded:g}" : Current.Name switch
     {
         "Dashboard" => "Account health and activity across your local directory.",
         "Users" => "Manage fictional user accounts and simulate account operations.",
@@ -33,15 +34,16 @@ public sealed class ShellViewModel : Bindable
     public string Today => DateTime.Now.ToString("ddd, MMM d, yyyy");
     public ICommand Navigate { get; }
     public ICommand Run { get; }
-    public ShellViewModel(IDirectoryService directory, IDemoWorkspace workspace, IInteraction ui)
+    public ShellViewModel(IDirectoryService directory, IDemoWorkspace workspace, IInteraction ui, ILiveConnector connector)
     {
+        _live = new(connector);
         _directory = directory;
         _workspace = workspace;
         _ui = ui;
-        _current = Navigation[0];
+        _current = DemoNavigation[0];
         workspace.Record("Workspace opened", "northstar.example", "Success", "Local DEMO workspace initialized.");
         _page = new DashboardPage(directory.GetInventory(), workspace.Audit);
-        Navigate = new Command(p => Safe("Navigation", () => Open(p is NavItem n ? n.Name : p?.ToString() ?? "Dashboard")));
+        Navigate = new Command(p => Safe("Navigation", () => Open(p is NavItem n ? n.Name : p?.ToString() ?? "Dashboard")), p => !Busy && (!IsLive || (p as NavItem)?.Name != "Settings"));
         Run = new Command(p => Safe(p?.ToString() ?? "Command", () => Execute(p!.ToString()!)), p => Available(p?.ToString()));
     }
 
@@ -51,26 +53,29 @@ public sealed class ShellViewModel : Bindable
         catch (Exception e) when (e is DirectoryException or IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or System.Security.SecurityException)
         {
             Status = e.Message;
-            try { _workspace.Record(action, Current.Name, e is DirectoryException ? "Validation" : "Failed", e.Message); }
+            try { Record(action, Current.Name, e is DirectoryException ? "Validation" : "Failed", e.Message); }
             catch (Exception logError) when (logError is IOException or UnauthorizedAccessException) { Status += " Audit storage is unavailable."; }
             _ui.Inform("Action needs attention", Status);
         }
     }
     private void Open(string name)
     {
+        if (Busy || IsLive && !LiveNavigation.Any(n => n.Name == name)) return;
         string? filter = name == "Stale" ? "Stale" : null;
         if (filter != null) name = "Computers";
         Current = Navigation.Append(SettingsNav).First(n => n.Name == name);
-        _workspace.Record("Page viewed", name, "Success", "Opened workspace page.");
+        Record("Page viewed", name, "Success", "Opened workspace page.");
         Load(filter: filter);
         Status = $"{name} ready";
     }
 
     private void Load(bool preserve = false, string? filter = null)
     {
+        if (IsLive) { LoadLive(); return; }
         var d = _directory.GetInventory();
         Page = Current.Name switch
         {
+            "Connection Manager" => new ConnectionPage(),
             "Dashboard" => new DashboardPage(d, _workspace.Audit),
             "Bulk Operations" => new BulkPage(_preview, AuditViewChange),
             "Reports" => new ReportsPage(_workspace.Settings.ExportDirectory),
@@ -81,10 +86,16 @@ public sealed class ShellViewModel : Bindable
         CommandManager.InvalidateRequerySuggested();
     }
     private void AuditViewChange(string action) =>
-        Safe(action, () => _workspace.Record(action, Current.Name, "Success", "Directory view updated."));
+        Safe(action, () => Record(action, Current.Name, "Success", "Directory view updated."));
 
     private object? Selected => (Page as RecordsPage)?.Selected;
-    private bool Available(string? action) => action switch
+    private bool Available(string? action) => !Busy && (IsLive ? action switch
+    {
+        "Refresh" or "Disconnect" => true,
+        "Export" => Page is ReportsPage,
+        "View" => Page is LiveRecordsPage { Selected: not null } || Selected != null,
+        _ => false
+    } : action != "Disconnect" && action switch
     {
         "View" or "Edit" => Selected != null,
         "Enable" => Selected is DirectoryUser { Enabled: false },
@@ -93,7 +104,7 @@ public sealed class ShellViewModel : Bindable
         "ResetPassword" => Selected is DirectoryUser,
         "Apply" => _preview?.CanApply == true,
         _ => true
-    };
+    });
 
     private bool Confirm(string action, string target, string details, string accept)
     {
@@ -103,16 +114,18 @@ public sealed class ShellViewModel : Bindable
     }
     private void Cancel(string action, string target)
     {
-        _workspace.Record(action, target, "Cancelled", "Operator cancelled the action.");
+        Record(action, target, "Cancelled", "Operator cancelled the action.");
         Status = "Action cancelled";
     }
 
     private void Execute(string action)
     {
+        if (!Available(action)) return;
+        if (IsLive) { ExecuteLive(action); return; }
         switch (action)
         {
             case "Refresh":
-                _workspace.Record("View refreshed", Current.Name, "Success", "Reloaded the local directory view.");
+                Record("View refreshed", Current.Name, "Success", "Reloaded the local directory view.");
                 Load(true); Status = "Directory refreshed"; break;
             case "View": ViewSelected(); break;
             case "New": case "Edit": Edit(action == "Edit"); break;
@@ -132,7 +145,7 @@ public sealed class ShellViewModel : Bindable
             case "Folder":
                 var settings = (SettingsPage)Page;
                 string? path = _ui.ChooseFolder(settings.Folder);
-                if (path != null) { settings.Folder = path; _workspace.Record("Folder selected", "Settings", "Success", "Export directory selected for editing."); }
+                if (path != null) { settings.Folder = path; Record("Folder selected", "Settings", "Success", "Export directory selected for editing."); }
                 else Cancel("Choose folder", "Settings");
                 break;
             case "SaveSettings":
@@ -159,7 +172,7 @@ public sealed class ShellViewModel : Bindable
             AuditEntry a => (a.Action, $"{a.Timestamp.ToLocalTime():F}\nActor   {a.Actor}\nTarget   {a.Target}\nOutcome   {a.Outcome}\n\n{a.Details}"),
             _ => throw new DirectoryException("Select a record.")
         };
-        _workspace.Record("Record viewed", target, "Success", Current.Name);
+        Record("Record viewed", target, "Success", Current.Name);
         _ui.Inform(target, detail);
     }
 
@@ -190,7 +203,7 @@ public sealed class ShellViewModel : Bindable
     private void ValidateSave(Action work)
     {
         try { work(); }
-        catch (DirectoryException e) { _workspace.Record("Form validation", Current.Name, "Validation", e.Message); throw; }
+        catch (DirectoryException e) { Record("Form validation", Current.Name, "Validation", e.Message); throw; }
     }
     private void Account(AccountAction action)
     {

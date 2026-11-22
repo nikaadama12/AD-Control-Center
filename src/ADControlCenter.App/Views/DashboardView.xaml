@@ -41,8 +41,8 @@
         </Grid.ColumnDefinitions>
         <Border Style="{StaticResource Card}">
           <StackPanel>
-            <TextBlock Text="Users by organizational unit" Style="{StaticResource Heading}" />
-            <TextBlock Text="Account distribution · Top 6 units" Style="{StaticResource Caption}" Margin="0,3,0,11" />
+            <TextBlock Text="{Binding DistributionTitle}" Style="{StaticResource Heading}" />
+            <TextBlock Text="{Binding DistributionCaption}" Style="{StaticResource Caption}" Margin="0,3,0,11" />
             <ItemsControl ItemsSource="{Binding Units}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
