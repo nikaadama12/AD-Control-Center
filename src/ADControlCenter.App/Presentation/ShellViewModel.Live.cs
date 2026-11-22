@@ -26,7 +26,7 @@ public sealed partial class ShellViewModel
     public string OperatorLabel => IsLive ? "Directory reader" : "Demo Operator";
     public string OperatorDetail => IsLive ? "Authenticated session" : "Local administrator demo";
     public string Initials => IsLive ? "RO" : "DO";
-    private static string PrivateExports => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AD Control Center", "LiveExports");
+    private string PrivateExports { get; }
     private void NotifySession()
     {
         foreach (string property in new[] { nameof(Navigation), nameof(IsLive), nameof(CanConnect), nameof(CanDisconnect), nameof(Busy),
@@ -126,13 +126,7 @@ public sealed partial class ShellViewModel
                 _ui.Inform(row.Name, row.Details); break;
             case "View" when Page is RecordsPage: ViewSelected(); break;
             case "Export" when Page is ReportsPage report:
-                var count = _live.Objects.Count(o => o.Kind == (report.Selected.Kind == ReportKind.Users ? ObjectKind.Users : ObjectKind.Computers));
-                if (!Confirm("Export private directory data?", "Reports",
-                    $"Write {count:N0} real {report.Selected.Kind.ToString().ToLowerInvariant()} to {PrivateExports}? The {report.Format} file contains identifying account details and directory paths. Store it privately and keep it out of Git.", "Export private report")) return;
-                string file = ReportWriter.WriteLive(PrivateExports, _live.Objects, report.Selected.Kind, report.Format);
-                Record("Report exported", "Reports", "Success", "Private export confirmed.");
-                Status = "Private report exported";
-                _ui.Inform("Report exported", file); break;
+                ExportReport(report); break;
         }
     }
 }

@@ -143,7 +143,7 @@ internal sealed class LdapReader(LdapConnection connection, string namingContext
             {
                 var request = new SearchRequest(NamingContext, filter, SearchScope.Subtree, "name", "displayName", "sAMAccountName",
                     "userAccountControl", "msDS-User-Account-Control-Computed", "operatingSystem", "mail", "description", "dNSHostName",
-                    "lastLogonTimestamp", "member", "memberOf");
+                    "lastLogonTimestamp", "member", "memberOf", "groupType");
                 var paging = new PageResultRequestControl(250) { IsCritical = true };
                 request.Controls.Add(paging);
                 do
@@ -165,7 +165,11 @@ internal sealed class LdapReader(LdapConnection connection, string namingContext
                         objects.Add(new(kind, display.Length > 0 ? display : Get("name"), entry.DistinguishedName, Get("sAMAccountName"),
                             status, Get("operatingSystem"), Get("mail"), Get("description"), Get("dNSHostName"),
                             time > 0 && time <= DateTime.MaxValue.ToFileTimeUtc() ? DateTimeOffset.FromFileTime(time).ToUniversalTime() : null,
-                            ReadLinks(entry, "member", token), ReadLinks(entry, "memberOf", token)));
+                            ReadLinks(entry, "member", token), ReadLinks(entry, "memberOf", token))
+                        {
+                            IsSecurityGroup = kind == ObjectKind.Groups && long.TryParse(Get("groupType"), CultureInfo.InvariantCulture, out long groupType)
+                                && (groupType & 0x80000000L) != 0
+                        });
                     }
                     paging.Cookie = result.Controls.OfType<PageResultResponseControl>().SingleOrDefault()?.Cookie
                         ?? throw new DirectoryException("The server did not acknowledge paging. The partial snapshot was discarded.");

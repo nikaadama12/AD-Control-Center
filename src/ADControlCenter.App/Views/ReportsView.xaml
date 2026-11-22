@@ -5,7 +5,13 @@
         <StackPanel>
           <TextBlock Text="Export a report" Style="{StaticResource Heading}" Margin="0,0,0,16" />
           <TextBlock Text="Directory dataset" Margin="0,0,0,6" />
-          <ComboBox ItemsSource="{Binding Choices}" DisplayMemberPath="Name" SelectedItem="{Binding Selected}" Width="230" HorizontalAlignment="Left" AutomationProperties.Name="Directory dataset" />
+          <ComboBox ItemsSource="{Binding Choices}" DisplayMemberPath="Name" SelectedItem="{Binding Selected}" Width="230" HorizontalAlignment="Left" AutomationProperties.Name="Directory dataset">
+            <ComboBox.ItemContainerStyle>
+              <Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
+                <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+              </Style>
+            </ComboBox.ItemContainerStyle>
+          </ComboBox>
           <TextBlock Text="{Binding Selected.Description}" Style="{StaticResource Caption}" Margin="0,6,0,16" TextWrapping="Wrap" />
           <TextBlock Text="File format" Margin="0,0,0,6" />
           <ComboBox ItemsSource="{Binding Formats}" SelectedItem="{Binding Format}" Width="140" HorizontalAlignment="Left" AutomationProperties.Name="File format" />

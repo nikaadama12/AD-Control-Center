@@ -19,6 +19,7 @@ public sealed record LiveObject(ObjectKind Kind, string Name, string Distinguish
     string Status, string Platform, string Email, string Description, string Hostname, DateTimeOffset? LastLogon,
     IReadOnlyList<string> Members, IReadOnlyList<string> MemberOf)
 {
+    public bool IsSecurityGroup { get; init; }
     public string Parent => ParentOf(DistinguishedName);
     public static string ParentOf(string dn)
     {

@@ -201,9 +201,22 @@ try {
     Wait-Text $window 'CSV import applied'
     Click-Button $window 'Reports'
     Click-Button $window 'Export report'
+    Confirm-Action $window 'Export detailed directory data?' 'Export details'
     Confirm-Action $window 'Report exported' 'Close'
     $export = Get-ChildItem -LiteralPath (Join-Path $testData 'Exports') -Filter '*.csv' -File
     if (@(Import-Csv $export.FullName).Count -ne 132) { throw 'Unexpected exported report size.' }
+    Choose-Option $window 'Directory dataset' 'Counts Only (Privacy-Safe)'
+    Click-Button $window 'Export report'
+    Confirm-Action $window 'Export aggregate counts?' 'Cancel'
+    Wait-Text $window 'Action cancelled'
+    $exportFolder = Join-Path $testData 'Exports'
+    if (@(Get-ChildItem -LiteralPath $exportFolder -File).Count -ne 1) { throw 'Cancelled export created a file.' }
+    Click-Button $window 'Export report'
+    Confirm-Action $window 'Export aggregate counts?' 'Export counts'
+    Confirm-Action $window 'Report exported' 'Close'
+    $countsFile = Get-ChildItem -LiteralPath $exportFolder -Filter 'demo-countsonly-*.csv' -File
+    $metrics = @(Import-Csv $countsFile.FullName)
+    if ($metrics.Count -ne 6 -or $metrics[0].Metric -ne 'Total users' -or $metrics[0].Count -ne '132') { throw 'Unexpected counts export.' }
     Click-Button $window 'Settings'
     Click-Button $window 'Clear directory…'
     $confirm = Wait-For { Find-Element $window 'Clear demo directory?' ([Windows.Automation.ControlType]::Window) } 'clear confirmation'

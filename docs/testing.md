@@ -20,6 +20,10 @@ The Windows test project injects a mock authenticated reader into the session an
 
 Use the [lab acceptance checklist](live-lab.md) to verify real binds, trust, object visibility, memberships and controller-specific behavior.
 
+### Reports regression coverage
+
+The v1.1.1 cases render the themed WPF selector and verify the dropdown label, closed label and typed selection for each dataset in both modes. Export tests compare the complete aggregate file before and after replacing fixture identifiers. They also check all six metrics, empty inventories, security-group filtering, output schemas, destination restrictions and cancelling before file creation. Live Read-Only Mode uses a mock provider with synthetic records.
+
 ## Desktop smoke test
 
 Close any prior smoke-test file picker and run the script in a Windows PowerShell session after building Release.

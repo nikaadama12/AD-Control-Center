@@ -34,8 +34,9 @@ public sealed partial class ShellViewModel : Bindable
     public string Today => DateTime.Now.ToString("ddd, MMM d, yyyy");
     public ICommand Navigate { get; }
     public ICommand Run { get; }
-    public ShellViewModel(IDirectoryService directory, IDemoWorkspace workspace, IInteraction ui, ILiveConnector connector)
+    public ShellViewModel(IDirectoryService directory, IDemoWorkspace workspace, IInteraction ui, ILiveConnector connector, string? liveExportFolder = null)
     {
+        PrivateExports = liveExportFolder ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AD Control Center", "LiveExports");
         _live = new(connector);
         _directory = directory;
         _workspace = workspace;
@@ -139,9 +140,7 @@ public sealed partial class ShellViewModel : Bindable
                 if (_preview == null || !Confirm("Apply CSV import?", _preview.Source, $"Create {_preview.Rows.Count} enabled DEMO users from {_preview.Source}?", "Create users")) return;
                 _directory.ApplyImport(_preview); _preview = null; Load(); Status = "CSV import applied"; break;
             case "Export":
-                var report = (ReportsPage)Page;
-                string file = _workspace.Export(report.Selected.Kind, report.Format);
-                Status = "Report exported"; _ui.Inform("Report exported", file); break;
+                ExportReport((ReportsPage)Page); break;
             case "Folder":
                 var settings = (SettingsPage)Page;
                 string? path = _ui.ChooseFolder(settings.Folder);
@@ -160,6 +159,25 @@ public sealed partial class ShellViewModel : Bindable
                 if (reset) _workspace.Reset(); else _workspace.Clear();
                 _preview = null; Load(); Status = reset ? "Sample directory restored" : "Demo directory cleared"; break;
         }
+    }
+
+    private void ExportReport(ReportsPage report)
+    {
+        var choice = report.Selected;
+        bool counts = choice.Kind == ReportKind.CountsOnly;
+        string title = counts ? "Export aggregate counts?" : "Export detailed directory data?";
+        string scope = IsLive && !counts ? $"{ReportWriter.LiveDetailCount(_live.Objects, choice.Kind):N0} live records."
+            : ModeLabel;
+        string privacy = counts ? "" : IsLive ? "\nThis file contains real identifying data. Keep it private and outside Git."
+            : "\nThis file contains individual fictional directory records.";
+        if (!Confirm(title, "Reports", $"{choice.Name} · {scope}\n{choice.Description}{privacy}\n\n{report.Format} destination: {report.Folder}",
+            counts ? "Export counts" : "Export details")) return;
+
+        string file = IsLive ? ReportWriter.WriteLive(report.Folder, _live.Objects, choice.Kind, report.Format)
+            : _workspace.Export(choice.Kind, report.Format);
+        if (IsLive) Record("Report exported", "Reports", "Success", counts ? "Aggregate export confirmed." : "Detailed export confirmed.");
+        Status = "Report exported";
+        _ui.Inform("Report exported", file);
     }
 
     private void ViewSelected()

@@ -141,7 +141,7 @@
       <Border Grid.Row="3" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource Line}" Padding="16,0">
         <DockPanel>
           <ProgressBar DockPanel.Dock="Right" Width="80" Height="4" Margin="8,0" IsIndeterminate="True" Visibility="{Binding Busy,Converter={StaticResource VisibleWhen}}"/>
-          <TextBlock DockPanel.Dock="Right" Text="v1.1.0" Style="{StaticResource Tiny}" />
+          <TextBlock DockPanel.Dock="Right" Text="v1.1.1" Style="{StaticResource Tiny}" />
           <Ellipse DockPanel.Dock="Left" Fill="{DynamicResource AccentText}" Width="6" Height="6" Margin="0,0,7,0" />
           <TextBlock Text="{Binding Status}" Style="{StaticResource Tiny}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Status}" />
         </DockPanel>

@@ -10,7 +10,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace ADControlCenter.LiveTests;
 
 [TestClass]
-public sealed class LiveTests
+public sealed partial class LiveTests
 {
     private static LiveObject Row(int number) => new(ObjectKind.Users, $"Fixture {number:D3}", $"CN=Fixture {number},OU=Mock,DC=example",
         $"mock{number}", number % 2 == 0 ? "Enabled" : "Disabled", "", "", "", "", null, [], []);
@@ -36,7 +36,9 @@ public sealed class LiveTests
     private sealed class Dialogs : IInteraction
     {
         public int Confirms { get; private set; }
-        public bool Confirm(string title, string details, string accept) { Confirms++; return false; }
+        public bool Accept { get; set; }
+        public string Prompt { get; private set; } = "";
+        public bool Confirm(string title, string details, string accept) { Confirms++; Prompt = details; return Accept; }
         public void Inform(string title, string details) { }
         public bool EditUser(DirectoryUser? user, Action<UserInput> save) => throw new AssertFailedException();
         public bool EditGroup(DirectoryGroup? group, IReadOnlyList<DirectoryUser> users, Func<string, string, IReadOnlyList<Guid>, bool> save) => throw new AssertFailedException();

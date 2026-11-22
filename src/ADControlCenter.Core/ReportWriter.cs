@@ -1,3 +1,4 @@
+using ADControlCenter.Core.Live;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -8,15 +9,27 @@ public static class ReportWriter
 {
     internal static string Write(DirectoryData data, ReportKind kind, ReportFormat format)
     {
-        string[] headers = kind == ReportKind.Users ? ["DisplayName", "Username", "Department", "Status"]
-            : ["Name", "OperatingSystem", "Department", "LastSeenUtc", "Status"];
-        IEnumerable<string[]> records = kind == ReportKind.Users
-            ? data.Users.Select(u => new[] { u.DisplayName, u.Username, u.Department, u.Status })
-            : data.Computers.Select(c => new[] { c.Name, c.OperatingSystem, c.Department, c.LastSeen.UtcDateTime.ToString("O"), c.Status });
-        return WriteRows(data.Settings.ExportDirectory, "demo", kind, format, headers, records, "northstar.example · Fictional directory");
+        var units = data.Users.Select(u => u.Department).Concat(data.Computers.Select(c => c.Department))
+            .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase);
+        if (kind == ReportKind.CountsOnly)
+            return WriteCounts(data.Settings.ExportDirectory, "demo", format, data.Users.Count,
+                data.Users.Count(u => u.Enabled), data.Users.Count(u => !u.Enabled), data.Groups.Count, data.Computers.Count, units.Count());
+
+        (string[] Headers, IEnumerable<string[]> Rows) table = kind switch
+        {
+            ReportKind.Users => (["DisplayName", "Username", "Department", "Status"],
+                data.Users.Select(u => new[] { u.DisplayName, u.Username, u.Department, u.Status })),
+            ReportKind.Computers => (["Name", "OperatingSystem", "Department", "LastSeenUtc", "Status"],
+                data.Computers.Select(c => new[] { c.Name, c.OperatingSystem, c.Department, c.LastSeen.UtcDateTime.ToString("O"), c.Status })),
+            ReportKind.SecurityGroups => (["Name", "Description", "MemberCount"],
+                data.Groups.Select(g => new[] { g.Name, g.Description, Number(g.MemberCount) })),
+            ReportKind.OrganizationalUnits => (["OrganizationalUnit"], units.Select(unit => new[] { unit })),
+            _ => throw new DirectoryException("Unknown report dataset.")
+        };
+        return WriteRows(data.Settings.ExportDirectory, "demo", kind, format, table.Headers, table.Rows, "northstar.example · Fictional directory");
     }
 
-    public static string WriteLive(string folder, IReadOnlyList<Live.LiveObject> snapshot, ReportKind kind, ReportFormat format)
+    public static string WriteLive(string folder, IReadOnlyList<LiveObject> snapshot, ReportKind kind, ReportFormat format)
     {
         if (format is not (ReportFormat.Csv or ReportFormat.Html)) throw new DirectoryException("Choose CSV or HTML for a live report.");
         for (var dir = new DirectoryInfo(folder); dir != null; dir = dir.Parent)
@@ -25,10 +38,49 @@ public static class ReportWriter
                 dir.Exists && dir.Attributes.HasFlag(FileAttributes.ReparsePoint))
                 throw new DirectoryException("Live exports require a private location outside Git and linked directories.");
         }
-        var entries = snapshot.Where(o => o.Kind == (kind == ReportKind.Users ? Live.ObjectKind.Users : Live.ObjectKind.Computers));
-        string[] headers = ["Name", "Account", "Parent", "Status", kind == ReportKind.Users ? "Email" : "OperatingSystem"];
-        var rows = entries.Select(o => new[] { o.Name, o.Account, o.Parent, o.Status, kind == ReportKind.Users ? o.Email : o.Platform });
-        return WriteRows(folder, "live", kind, format, headers, rows, "Private · Live directory snapshot");
+        if (kind == ReportKind.CountsOnly)
+        {
+            var users = snapshot.Where(o => o.Kind == ObjectKind.Users).ToArray();
+            return WriteCounts(folder, "live", format, users.Length, users.Count(u => u.Status is "Enabled" or "Locked"),
+                users.Count(u => u.Status == "Disabled"), snapshot.Count(o => o.Kind == ObjectKind.Groups),
+                snapshot.Count(o => o.Kind == ObjectKind.Computers), snapshot.Count(o => o.Kind == ObjectKind.OrganizationalUnits));
+        }
+
+        var entries = LiveDetailEntries(snapshot, kind);
+        (string[] Headers, IEnumerable<string[]> Rows) table = kind switch
+        {
+            ReportKind.Users or ReportKind.Computers => (["Name", "Account", "Parent", "Status", kind == ReportKind.Users ? "Email" : "OperatingSystem"],
+                entries.Select(o => new[] { o.Name, o.Account, o.Parent, o.Status, kind == ReportKind.Users ? o.Email : o.Platform })),
+            ReportKind.SecurityGroups => (["Name", "Parent", "Description", "MemberCount"],
+                entries.Select(g => new[] { g.Name, g.Parent, g.Description, Number(g.Members.Count) })),
+            ReportKind.OrganizationalUnits => (["Name", "DistinguishedName", "Parent"],
+                entries.Select(o => new[] { o.Name, o.DistinguishedName, o.Parent })),
+            _ => throw new DirectoryException("Unknown report dataset.")
+        };
+        return WriteRows(folder, "live", kind, format, table.Headers, table.Rows, "Private · Live directory snapshot");
+    }
+
+    public static int LiveDetailCount(IReadOnlyList<LiveObject> snapshot, ReportKind kind) => LiveDetailEntries(snapshot, kind).Count();
+
+    private static IEnumerable<LiveObject> LiveDetailEntries(IReadOnlyList<LiveObject> snapshot, ReportKind kind) => kind switch
+    {
+        ReportKind.Users => snapshot.Where(o => o.Kind == ObjectKind.Users),
+        ReportKind.Computers => snapshot.Where(o => o.Kind == ObjectKind.Computers),
+        ReportKind.SecurityGroups => snapshot.Where(o => o.Kind == ObjectKind.Groups && o.IsSecurityGroup),
+        ReportKind.OrganizationalUnits => snapshot.Where(o => o.Kind == ObjectKind.OrganizationalUnits),
+        _ => throw new DirectoryException("Choose a detailed report dataset.")
+    };
+
+    private static string Number(int count) => count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string WriteCounts(string folder, string mode, ReportFormat format, int users, int enabled,
+        int disabled, int groups, int computers, int units)
+    {
+        string[][] rows = [
+            ["Total users", Number(users)], ["Enabled users", Number(enabled)], ["Disabled users", Number(disabled)],
+            ["Total groups", Number(groups)], ["Total computers", Number(computers)], ["Total OUs", Number(units)]
+        ];
+        return WriteRows(folder, mode, ReportKind.CountsOnly, format, ["Metric", "Count"], rows, "Aggregate directory counts");
     }
 
     private static string WriteRows(string folder, string mode, ReportKind kind, ReportFormat format,

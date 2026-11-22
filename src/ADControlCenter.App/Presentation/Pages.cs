@@ -173,14 +173,30 @@ public sealed class BulkPage : Bindable
 }
 public sealed class ReportsPage : Bindable
 {
-    public ReportChoice[] Choices { get; } = [new("User accounts", "Names, usernames, organizational units and account status.", ReportKind.Users),
-        new("Computer inventory", "Hostnames, operating systems, organizational units and last activity.", ReportKind.Computers)];
-    public ReportFormat[] Formats { get; } = Enum.GetValues<ReportFormat>();
+    public ReportChoice[] Choices { get; }
+    public ReportFormat[] Formats { get; }
     private ReportChoice _selected;
     public ReportChoice Selected { get => _selected; set => Set(ref _selected, value); }
     public ReportFormat Format { get; set; }
     public string Folder { get; }
-    public ReportsPage(string folder, bool live = false) { Folder = folder; _selected = Choices[0]; if (live) Formats = [ReportFormat.Csv, ReportFormat.Html]; }
+
+    public ReportsPage(string folder, bool live = false)
+    {
+        Folder = folder;
+        Formats = live ? [ReportFormat.Csv, ReportFormat.Html] : Enum.GetValues<ReportFormat>();
+        Choices = [
+            new("User accounts", live ? "Names, account names, parent directory paths, account states and email addresses."
+                : "Display names, usernames, organizational units and account states.", ReportKind.Users),
+            new("Security groups", live ? "Security group names, parent directory paths, descriptions and direct member counts."
+                : "Group names, descriptions and member counts.", ReportKind.SecurityGroups),
+            new("Computers", live ? "Names, account names, parent directory paths, account states and operating systems."
+                : "Hostnames, operating systems, organizational units, last activity and stale-account status.", ReportKind.Computers),
+            new("Organizational units", live ? "OU names, distinguished names and parent directory paths."
+                : "Distinct organizational unit names assigned to demo users and computers.", ReportKind.OrganizationalUnits),
+            new("Counts Only (Privacy-Safe)", "Six numeric totals only: users, enabled users, disabled users, groups, computers and OUs. No identifying fields.", ReportKind.CountsOnly)
+        ];
+        _selected = Choices[0];
+    }
 }
 
 public sealed class SettingsPage(Preferences prefs) : Bindable

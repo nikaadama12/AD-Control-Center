@@ -34,7 +34,7 @@ public sealed record ImportPreview(IReadOnlyList<ImportRow> Rows, long Revision,
 }
 
 public enum AccountAction { Enable, Disable, Unlock, ResetPassword }
-public enum ReportKind { Users, Computers }
+public enum ReportKind { Users, Computers, SecurityGroups, OrganizationalUnits, CountsOnly }
 public enum ReportFormat { Csv, Json, Html }
 public sealed class DirectoryException(string message) : Exception(message);
 

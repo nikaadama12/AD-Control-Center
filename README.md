@@ -1,6 +1,6 @@
 # AD Control Center
 
-A Windows desktop portfolio project for practicing directory administration. Version 1.1 starts in **DEMO MODE** and adds an optional **LIVE READ-ONLY MODE** for Active Directory. The demo opens a fictional **northstar.example** workspace with **128 users, 84 computers, and 12 security groups**. Explore account health, review stale devices, simulate support tasks, and export the results from a standard Windows user session.
+A Windows desktop portfolio project for practicing directory administration. Version 1.1.1 starts in **DEMO MODE** and adds an optional **LIVE READ-ONLY MODE** for Active Directory. The demo opens a fictional **northstar.example** workspace with **128 users, 84 computers, and 12 security groups**. Explore account health, review stale devices, simulate support tasks, and export the results from a standard Windows user session.
 
 ![AD Control Center dashboard showing the sample directory and its account health](docs/screenshots/dashboard.png)
 
@@ -28,7 +28,24 @@ Open **Connection Manager**, enter the controller FQDN and select **LDAPS** or *
 
 Live mode reads users, groups, computers and the OU hierarchy. Refresh queries the controller again. Directory writes are disabled. Live inventory, credentials and session events stay in memory. A confirmed CSV or HTML export is the explicit path to disk. **Disconnect** restores the existing demo workspace.
 
-[Lab DNS, transport requirements and step-by-step acceptance checks](docs/live-lab.md) · [Changelog](CHANGELOG.md) · [GitHub release procedure](docs/release-v1.1.md)
+[Lab DNS, transport requirements and step-by-step acceptance checks](docs/live-lab.md) · [Changelog](CHANGELOG.md) · [v1.1.1 release notes](docs/release-v1.1.1.md)
+
+## Export a privacy-safe summary
+
+Open **Reports → Directory dataset → Counts Only (Privacy-Safe)**. Choose CSV or HTML, select **Export report**, review the destination and choose **Export counts**. The file has two columns, **Metric** and **Count**, with six rows.
+
+| Metric | Fresh demo value |
+| --- | ---: |
+| Total users | 128 |
+| Enabled users | 120 |
+| Disabled users | 8 |
+| Total groups | 12 |
+| Total computers | 84 |
+| Total OUs | 6 |
+
+Live counts use the last completed read-only snapshot. Enabled users include enabled accounts that are locked. Users whose account state is unavailable contribute only to total users. Total groups includes security and distribution groups. Live OU totals count visible OU objects. Demo OU totals count distinct units assigned to users or computers.
+
+Detailed exports are available for **User accounts**, **Security groups**, **Computers** and **Organizational units**. Each selection describes its fields before export and requires explicit confirmation. Cancelling creates no report file. Live exports, including aggregate summaries, use the private export folder outside Git. Demo Mode also supports JSON.
 
 ## Explore the demo workspace
 
@@ -39,7 +56,7 @@ Live mode reads users, groups, computers and the OU hierarchy. Refresh queries t
 | Computers | Combine operating system, unit and stale/current filters. A device becomes stale after more than 90 days since its last recorded activity. |
 | Groups | Create a security group, edit its description and search the membership checklist. Confirm removals before saving. |
 | Bulk Operations | Choose a test CSV, review all proposed users and validation messages, then confirm the complete import. |
-| Reports | Export user accounts or computer inventory to CSV, JSON or HTML. The completion dialog includes the full output path. |
+| Reports | Export detailed records or a six-metric counts summary to CSV, JSON or HTML. The completion dialog includes the full output path. |
 | Audit Logs | Search the actor, action, target, outcome or details. Sort columns, filter outcomes and open a row to read its full event. |
 | Settings | Switch between dark and light themes, select an export directory, clear the demo directory or restore sample records. |
 
