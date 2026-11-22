@@ -1,0 +1,20 @@
+# .NET and Visual Studio
+[Bb]in/
+[Oo]bj/
+.vs/
+*.user
+*.suo
+*.userosscache
+TestResults/
+artifacts/
+*.trx
+*.binlog
+# Generated local workspaces and exports
+directory.json
+directory.json.tmp
+workspace.lock
+Exports/
+# Editor and OS files
+.idea/
+Thumbs.db
+Desktop.ini

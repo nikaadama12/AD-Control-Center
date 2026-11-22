@@ -1,0 +1,19 @@
+<UserControl x:Class="ADControlCenter.App.Views.ReportsView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel>
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Text="Export a report" Style="{StaticResource Heading}" Margin="0,0,0,16" />
+          <TextBlock Text="Directory dataset" Margin="0,0,0,6" />
+          <ComboBox ItemsSource="{Binding Choices}" DisplayMemberPath="Name" SelectedItem="{Binding Selected}" Width="230" HorizontalAlignment="Left" AutomationProperties.Name="Directory dataset" />
+          <TextBlock Text="{Binding Selected.Description}" Style="{StaticResource Caption}" Margin="0,6,0,16" TextWrapping="Wrap" />
+          <TextBlock Text="File format" Margin="0,0,0,6" />
+          <ComboBox ItemsSource="{Binding Formats}" SelectedItem="{Binding Format}" Width="140" HorizontalAlignment="Left" AutomationProperties.Name="File format" />
+          <TextBlock Text="Export directory" Margin="0,18,0,5" />
+          <TextBlock Text="{Binding Folder}" Style="{StaticResource Tiny}" TextWrapping="Wrap" />
+          <Button Content="Export report" Command="{Binding DataContext.Run,RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="Export" Style="{StaticResource Primary}" Margin="0,20,0,0" HorizontalAlignment="Left" />
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

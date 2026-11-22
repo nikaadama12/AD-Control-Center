@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>ADControlCenter</AssemblyName>
+    <Product>AD Control Center</Product>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ADControlCenter.Core\ADControlCenter.Core.csproj" />
+    <Resource Include="Assets\app.ico" />
+  </ItemGroup>
+</Project>
