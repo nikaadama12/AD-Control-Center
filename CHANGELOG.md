@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.3
+
+- Hardened temporary-password handling in onboarding. The LDAP request preserves UTF-16 code units and clears its temporary buffers on success or exception.
+- Added numeric LDAP and AD rejection codes to diagnostics. Password-policy, encoding, transport and delegation errors have distinct messages. Raw server diagnostic text stays out of the journal.
+- Added ten regression cases. A prior acceptance run of this patch completed all four onboarding steps in an isolated Windows Server 2025 domain. The cause of the earlier password rejection remains unresolved. [Lab verification and release notes](docs/release-v1.2.3.md)
+
 ## 1.2.2
 
 - Kept all 13 sidebar destinations accessible in every mode. Added a demo OU browser, read-only management views, connection-specific appearance settings and explanations for restricted actions.

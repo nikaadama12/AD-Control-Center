@@ -1,10 +1,12 @@
 # AD Control Center
 
-AD Control Center **1.2.2** is a Windows desktop portfolio project for practicing directory administration. It starts in **DEMO MODE**. A live connection opens in **LIVE READ-ONLY MODE**. A delegated operator can explicitly enable **LIVE ADMINISTRATION MODE** for the isolated AppTesting lab. The demo opens a fictional **northstar.example** workspace with **128 users, 84 computers, and 12 security groups**. Explore account health, review stale devices, simulate support tasks, and export the results from a standard Windows user session.
+AD Control Center **1.2.3** is a Windows desktop portfolio project for practicing directory administration. It starts in **DEMO MODE**. A live connection opens in **LIVE READ-ONLY MODE**. A delegated operator can explicitly enable **LIVE ADMINISTRATION MODE** for the isolated AppTesting lab. The demo opens a fictional **northstar.example** workspace with **128 users, 84 computers, and 12 security groups**. Explore account health, review stale devices, simulate support tasks, and export the results from a standard Windows user session.
 
 ![AD Control Center dashboard showing the sample directory and its account health](docs/screenshots/dashboard.png)
 
 ## Run on Windows 11
+
+For the packaged release, compare the SHA-256 of `ADControlCenter-1.2.3-win-x64.exe` with `SHA256SUMS.txt`, then open the executable as a standard user. The desktop runtime is included.
 
 Build from source with the **.NET 10 SDK**. Run these PowerShell commands from the solution directory.
 
@@ -53,7 +55,7 @@ For live use, install the machine-owned policy and delegate rights on the dispos
 
 [Onboarding guide](docs/onboarding.md) · [Delegated permissions and policy](docs/delegated-administration.md)
 
-[Lab DNS, transport requirements and step-by-step acceptance checks](docs/live-lab.md) · [Changelog](CHANGELOG.md) · [v1.2.2 release notes](docs/release-v1.2.2.md)
+[Lab DNS, transport requirements and step-by-step acceptance checks](docs/live-lab.md) · [Changelog](CHANGELOG.md) · [v1.2.3 release notes and lab verification](docs/release-v1.2.3.md)
 
 ## Export a privacy-safe summary
 

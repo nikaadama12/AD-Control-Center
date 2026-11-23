@@ -44,16 +44,37 @@ internal sealed class LdapAdministration : IAdminBackend
         try { return _ldap.SendRequest(request, LdapConnector.Timeout); }
         catch (DirectoryOperationException e) when (e.Response != null)
         {
-            throw new DirectoryException(e.Response.ResultCode switch
-            {
-                ResultCode.InsufficientAccessRights => "The controller denied the delegated operation.",
-                ResultCode.ConstraintViolation or ResultCode.UnwillingToPerform => "The controller rejected the value or account/password policy.",
-                ResultCode.EntryAlreadyExists or ResultCode.AttributeOrValueExists => "The object or membership already exists.",
-                ResultCode.NoSuchObject or ResultCode.NoSuchAttribute => "The target or reviewed value no longer exists.",
-                _ => $"The controller rejected the request ({(int)e.Response.ResultCode})."
-            });
+            throw ControllerRejection(e.Response.ResultCode, e.Response.ErrorMessage);
         }
         // Transport failures propagate to the workflow as unconfirmed once a write has been submitted.
+    }
+    internal static DirectoryException ControllerRejection(ResultCode result, string? diagnostic)
+    {
+        // AD prefixes its free-form diagnostic with a Win32 code. Only the number is safe to journal.
+        uint? status = null;
+        if (diagnostic is { Length: >= 8 } && (diagnostic.Length == 8 || diagnostic[8] == ':') &&
+            uint.TryParse(diagnostic.AsSpan(0, 8), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out uint code))
+            status = code;
+
+        string detail = status switch
+        {
+            0x52D => "The controller rejected the password under the effective password policy.",
+            0x216C => "The controller rejected the quotation marks in the unicodePwd encoding.",
+            0x202D => "The controller requires confidentiality for this operation.",
+            0x2098 => "The controller denied the delegated operation.",
+            _ => result switch
+            {
+                ResultCode.InsufficientAccessRights => "The controller denied the delegated operation.",
+                ResultCode.ConfidentialityRequired or ResultCode.StrongAuthRequired => "The controller requires stronger connection protection.",
+                ResultCode.ConstraintViolation => "The controller reported a directory constraint violation.",
+                ResultCode.UnwillingToPerform => "The controller declined this operation.",
+                ResultCode.EntryAlreadyExists or ResultCode.AttributeOrValueExists => "The object or membership already exists.",
+                ResultCode.NoSuchObject or ResultCode.NoSuchAttribute => "The target or reviewed value no longer exists.",
+                _ => "The controller rejected the request."
+            }
+        };
+        string codes = status.HasValue ? $"LDAP {(int)result}, AD 0x{status:X8}" : $"LDAP {(int)result}";
+        return new DirectoryException($"{detail} ({codes})");
     }
     private SearchResponse Search(string dn, string filter, SearchScope scope, params string[] attrs) =>
         (SearchResponse)Send(new SearchRequest(dn, filter, scope, attrs));
@@ -274,7 +295,12 @@ internal sealed class LdapAdministration : IAdminBackend
             case AdminAction.TemporaryPassword:
                 if (!_unfinished.Contains(c.User) || _passwordAssigned.Contains(c.User) || (flags & 2) == 0) throw new DirectoryException("Password setup requires a newly created disabled account.");
                 AdminValidation.Password(secret);
-                return new(target, "Initial setup", "Temporary password assigned", () => { SetPassword(target, secret!); _passwordAssigned.Add(c.User); return c.User; });
+                return new(target, "Initial setup", "Temporary password assigned", () =>
+                {
+                    SendPasswordReset(target, secret!, request => Send(request));
+                    _passwordAssigned.Add(c.User);
+                    return c.User;
+                });
             case AdminAction.AccountSettings:
             case AdminAction.SetEnabled:
                 if (c.Action == AdminAction.AccountSettings && (!_unfinished.Contains(c.User) || !_passwordAssigned.Contains(c.User))) throw new DirectoryException("Onboarding context expired.");
@@ -317,18 +343,18 @@ internal sealed class LdapAdministration : IAdminBackend
             return c.User;
         });
     }
-    private void SetPassword(string dn, SecureString password)
+    internal static void SendPasswordReset(string dn, SecureString password, Action<ModifyRequest> send)
     {
         byte[] quoted = new byte[checked((password.Length + 2) * 2)];
-        IntPtr ptr = Marshal.SecureStringToGlobalAllocUnicode(password);
+        IntPtr ptr = Marshal.SecureStringToBSTR(password);
         try
         {
             quoted[0] = 34; quoted[^2] = 34;
             Marshal.Copy(ptr, quoted, 2, password.Length * 2);
             var mod = new DirectoryAttributeModification { Name = "unicodePwd", Operation = DirectoryAttributeOperation.Replace };
             mod.Add(quoted);
-            Send(new ModifyRequest(dn, mod));
+            send(new ModifyRequest(dn, mod));
         }
-        finally { CryptographicOperations.ZeroMemory(quoted); Marshal.ZeroFreeGlobalAllocUnicode(ptr); }
+        finally { CryptographicOperations.ZeroMemory(quoted); Marshal.ZeroFreeBSTR(ptr); }
     }
 }
