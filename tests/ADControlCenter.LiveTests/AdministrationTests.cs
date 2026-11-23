@@ -11,7 +11,7 @@ using System.Text.Json;
 namespace ADControlCenter.LiveTests;
 
 [TestClass]
-public sealed class AdministrationTests
+public sealed partial class AdministrationTests
 {
     private string _folder = null!;
     private DemoDirectoryService _demo = null!;

@@ -66,3 +66,11 @@ public sealed class LiveRecordsPage : Bindable
         CommandManager.InvalidateRequerySuggested();
     }
 }
+
+public sealed record SectionNotice(string Heading, string Explanation);
+
+public sealed class LiveAppearancePage(string theme)
+{
+    public string[] Themes { get; } = ["Dark", "Light"];
+    public string Theme { get; set; } = theme;
+}

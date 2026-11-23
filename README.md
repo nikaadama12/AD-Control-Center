@@ -1,6 +1,6 @@
 # AD Control Center
 
-AD Control Center **1.2.1** is a Windows desktop portfolio project for practicing directory administration. It starts in **DEMO MODE**. A live connection opens in **LIVE READ-ONLY MODE**. A delegated operator can explicitly enable **LIVE ADMINISTRATION MODE** for the isolated AppTesting lab. The demo opens a fictional **northstar.example** workspace with **128 users, 84 computers, and 12 security groups**. Explore account health, review stale devices, simulate support tasks, and export the results from a standard Windows user session.
+AD Control Center **1.2.2** is a Windows desktop portfolio project for practicing directory administration. It starts in **DEMO MODE**. A live connection opens in **LIVE READ-ONLY MODE**. A delegated operator can explicitly enable **LIVE ADMINISTRATION MODE** for the isolated AppTesting lab. The demo opens a fictional **northstar.example** workspace with **128 users, 84 computers, and 12 security groups**. Explore account health, review stale devices, simulate support tasks, and export the results from a standard Windows user session.
 
 ![AD Control Center dashboard showing the sample directory and its account health](docs/screenshots/dashboard.png)
 
@@ -28,6 +28,21 @@ Open **Connection Manager**, enter the controller FQDN and select **LDAPS** or *
 
 Live Read-Only Mode displays users, groups, computers and the OU hierarchy. **Refresh** queries the controller again. Live inventory and credentials stay in memory. Confirmed reports go to the private export directory. Live Administration Mode also keeps a private operation journal. **Disconnect** restores your demo workspace.
 
+## Navigate across modes
+
+The sidebar keeps the same 13 destinations in the same order. The header badge identifies the current mode. Hover over it for the permission summary.
+
+| Page | Demo | Live Read-Only | Live Administration |
+| --- | --- | --- | --- |
+| Organizational Units | Browse locations assigned to local records | Browse the controller’s visible OU hierarchy | Same live inventory |
+| Onboarding | Practice the full wizard | Inspect visible OUs | Review destinations where policy and delegated user-creation access overlap |
+| Account Administration | Edit fictional accounts | Search real accounts and inspect attributes and memberships | Review eligible disposable accounts, editable attributes and approved membership targets |
+| Administration History | Read the demo journal | Read activity from this connection, including earlier authorized operations | Read the private lab administration journal |
+| Bulk Operations | Preview and confirm a fictional CSV import | View the reason import is unavailable | View the same restriction |
+| Settings | Save preferences or manage local samples | Apply a display theme for this connection | Apply a display theme for this connection |
+
+Select **Enable Live Administration…** on a read-only management page to open the existing confirmation and operator checks. **Refresh** updates inventory and delegated access. A policy change, an unreadable policy or a failed authorization refresh ends administration. Disconnecting restores the demo theme and records.
+
 ## Onboard an employee
 
 Launch the application and select **Onboarding** to try the entire workflow offline. Enter a fictional identity, choose an OU, apply a department template, set initial account options and review the proposed changes. The results show each acknowledged step. **Account administration** lets you edit attributes or compare current and proposed direct group memberships. **Administration history** records the operator and outcomes.
@@ -38,7 +53,7 @@ For live use, install the machine-owned policy and delegate rights on the dispos
 
 [Onboarding guide](docs/onboarding.md) · [Delegated permissions and policy](docs/delegated-administration.md)
 
-[Lab DNS, transport requirements and step-by-step acceptance checks](docs/live-lab.md) · [Changelog](CHANGELOG.md) · [v1.2.1 release notes](docs/release-v1.2.1.md)
+[Lab DNS, transport requirements and step-by-step acceptance checks](docs/live-lab.md) · [Changelog](CHANGELOG.md) · [v1.2.2 release notes](docs/release-v1.2.2.md)
 
 ## Export a privacy-safe summary
 

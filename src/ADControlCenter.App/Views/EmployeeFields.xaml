@@ -2,15 +2,15 @@
   <UniformGrid Columns="2">
     <StackPanel Margin="0,0,12,10">
       <TextBlock Text="First name" Margin="0,0,0,4" />
-      <TextBox AutomationProperties.Name="First name" MaxLength="64" Text="{Binding FirstName,UpdateSourceTrigger=PropertyChanged}" />
+      <TextBox AutomationProperties.Name="First name" MaxLength="64" IsEnabled="{Binding CanEditFirstName}" ToolTip="Editing requires an eligible account and write access to this attribute." ToolTipService.ShowOnDisabled="True" Text="{Binding FirstName,UpdateSourceTrigger=PropertyChanged}" />
     </StackPanel>
     <StackPanel Margin="0,0,12,10">
       <TextBlock Text="Last name" Margin="0,0,0,4" />
-      <TextBox AutomationProperties.Name="Last name" MaxLength="64" Text="{Binding LastName,UpdateSourceTrigger=PropertyChanged}" />
+      <TextBox AutomationProperties.Name="Last name" MaxLength="64" IsEnabled="{Binding CanEditLastName}" ToolTip="Editing requires an eligible account and write access to this attribute." ToolTipService.ShowOnDisabled="True" Text="{Binding LastName,UpdateSourceTrigger=PropertyChanged}" />
     </StackPanel>
     <StackPanel Margin="0,0,12,10">
       <TextBlock Text="Display name" Margin="0,0,0,4" />
-      <TextBox AutomationProperties.Name="Display name" MaxLength="128" Text="{Binding DisplayName,UpdateSourceTrigger=PropertyChanged}" />
+      <TextBox AutomationProperties.Name="Display name" MaxLength="128" IsEnabled="{Binding CanEditDisplayName}" ToolTip="Editing requires an eligible account and write access to this attribute." ToolTipService.ShowOnDisabled="True" Text="{Binding DisplayName,UpdateSourceTrigger=PropertyChanged}" />
     </StackPanel>
     <StackPanel Margin="0,0,12,10">
       <TextBlock Text="Username" Margin="0,0,0,4" />
@@ -22,19 +22,19 @@
     </StackPanel>
     <StackPanel Margin="0,0,12,10">
       <TextBlock Text="Department" Margin="0,0,0,4" />
-      <TextBox AutomationProperties.Name="Department" MaxLength="64" Text="{Binding Department,UpdateSourceTrigger=PropertyChanged}" />
+      <TextBox AutomationProperties.Name="Department" MaxLength="64" IsEnabled="{Binding CanEditDepartment}" ToolTip="Editing requires an eligible account and write access to this attribute." ToolTipService.ShowOnDisabled="True" Text="{Binding Department,UpdateSourceTrigger=PropertyChanged}" />
     </StackPanel>
     <StackPanel Margin="0,0,12,10">
       <TextBlock Text="Job title" Margin="0,0,0,4" />
-      <TextBox AutomationProperties.Name="Job title" MaxLength="128" Text="{Binding Title,UpdateSourceTrigger=PropertyChanged}" />
+      <TextBox AutomationProperties.Name="Job title" MaxLength="128" IsEnabled="{Binding CanEditTitle}" ToolTip="Editing requires an eligible account and write access to this attribute." ToolTipService.ShowOnDisabled="True" Text="{Binding Title,UpdateSourceTrigger=PropertyChanged}" />
     </StackPanel>
     <StackPanel Margin="0,0,12,10">
       <TextBlock Text="Email (optional)" Margin="0,0,0,4" />
-      <TextBox AutomationProperties.Name="Email (optional)" MaxLength="254" Text="{Binding Email,UpdateSourceTrigger=PropertyChanged}" />
+      <TextBox AutomationProperties.Name="Email (optional)" MaxLength="254" IsEnabled="{Binding CanEditEmail}" ToolTip="Editing requires an eligible account and write access to this attribute." ToolTipService.ShowOnDisabled="True" Text="{Binding Email,UpdateSourceTrigger=PropertyChanged}" />
     </StackPanel>
     <StackPanel Margin="0,0,12,10">
       <TextBlock Text="Description (optional)" Margin="0,0,0,4" />
-      <TextBox AutomationProperties.Name="Description (optional)" MaxLength="240" Text="{Binding Description,UpdateSourceTrigger=PropertyChanged}" />
+      <TextBox AutomationProperties.Name="Description (optional)" MaxLength="240" IsEnabled="{Binding CanEditDescription}" ToolTip="Editing requires an eligible account and write access to this attribute." ToolTipService.ShowOnDisabled="True" Text="{Binding Description,UpdateSourceTrigger=PropertyChanged}" />
     </StackPanel>
   </UniformGrid>
 </UserControl>

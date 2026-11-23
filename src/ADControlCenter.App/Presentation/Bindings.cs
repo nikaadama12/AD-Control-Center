@@ -20,7 +20,10 @@ public abstract class Bindable : INotifyPropertyChanged
 public sealed class Command(Action<object?> execute, Predicate<object?>? available = null) : ICommand
 {
     public bool CanExecute(object? parameter) => available?.Invoke(parameter) ?? true;
-    public void Execute(object? parameter) => execute(parameter);
+    public void Execute(object? parameter)
+    {
+        if (CanExecute(parameter)) execute(parameter);
+    }
     public event EventHandler? CanExecuteChanged
     {
         add => CommandManager.RequerySuggested += value;

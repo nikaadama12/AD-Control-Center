@@ -19,7 +19,7 @@ Operator groups authorize the named account. Writable membership targets use sep
 
 ### Upgrade a v1.2.0 machine policy
 
-A legacy policy can still be read. Live Administration requires at least one verified `ApprovedOperatorGroups` entry. Add that single array to the machine-owned policy, preserving the operator GUID, target GUIDs, OU list and templates. Preserve the file and directory owner and protected ACLs. Leave administration and re-enable it to reload the policy. The v1.2.0 binary rejects the new field if you roll back the executable.
+A legacy policy can still be read. Live Administration requires at least one verified `ApprovedOperatorGroups` entry. Add that single array to the machine-owned policy, preserving the operator GUID, target GUIDs, OU list and templates. Preserve the file and directory owner and protected ACLs. In v1.2.2 the active connection rechecks the machine-owned policy. A changed or unreadable policy revokes administration. Enable it again to review the new scope. The v1.2.0 binary rejects the new field if you roll back the executable.
 
 ### Check delegation without modifying AD
 

@@ -41,6 +41,7 @@
     <Setter Property="Padding" Value="18" />
   </Style>
   <Style TargetType="Button">
+    <Setter Property="ToolTipService.ShowOnDisabled" Value="True"/>
     <Setter Property="Foreground" Value="{DynamicResource Text}" />
     <Setter Property="Background" Value="{DynamicResource Panel}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
@@ -69,6 +70,11 @@
         </ControlTemplate>
       </Setter.Value>
     </Setter>
+    <Style.Triggers>
+      <Trigger Property="IsEnabled" Value="False">
+        <Setter Property="ToolTip" Value="This action is unavailable for the current selection or connection."/>
+      </Trigger>
+    </Style.Triggers>
   </Style>
   <Style x:Key="Primary" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
     <Setter Property="Foreground" Value="#172014" />

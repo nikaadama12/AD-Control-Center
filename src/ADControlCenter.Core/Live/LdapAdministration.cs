@@ -27,7 +27,8 @@ internal sealed class LdapAdministration : IAdminBackend
     private readonly HashSet<Guid> _passwordAssigned = [];
     private static readonly string[] Attributes = ["objectGUID","objectClass","objectSid","sIDHistory","sAMAccountName","msDS-PrincipalName",
         "adminCount","isCriticalSystemObject","primaryGroupID","userAccountControl","groupType","memberOf","givenName","sn","displayName",
-        "userPrincipalName","department","title","mail","description","pwdLastSet"];
+        "userPrincipalName","department","title","mail","description","pwdLastSet","allowedAttributesEffective"];
+    private AdminCatalog? _catalog;
     public string Actor { get; }
 
     public LdapAdministration(LdapConnection ldap, LabPolicy policy, Func<IReadOnlyList<LiveObject>> snapshot, Func<bool> active)
@@ -152,35 +153,65 @@ internal sealed class LdapAdministration : IAdminBackend
     }
     public AdminCatalog Catalog()
     {
-        if (!_active()) throw new DirectoryException("Administration mode is inactive.");
+        if (!_active() || _catalog == null) throw new DirectoryException("Refresh administration access before continuing.");
+        return _catalog;
+    }
+
+    public void RefreshAccess()
+    {
+        _catalog = null;
+        CheckActor();
         var objects = _snapshot();
-        var groups = objects.Where(o => o.Kind == ObjectKind.Groups && o.IsSecurityGroup && _policy.ApprovedGroups.Contains(o.Id) &&
-            _policy.AllowsOu(o.Parent) && o.MemberOf.Count == 0).ToArray();
-        return new(LabPolicy.Domain, objects.Where(o => o.Kind == ObjectKind.OrganizationalUnits && _policy.AllowsOu(o.DistinguishedName)).Select(o => o.DistinguishedName).Order().ToArray(),
-            objects.Where(o => o.Kind == ObjectKind.Users && o.EmployeeInfo != null && _policy.AllowsOu(o.Parent) && o.Id != _policy.OperatorId &&
-                (_created.Contains(o.Id) || _policy.ApprovedUsers.Contains(o.Id))).Select(o => new AdminPerson(o.Id, o.EmployeeInfo!, o.Parent, o.Status is "Locked" or "Enabled",
-                    groups.Where(g => g.Members.Contains(o.DistinguishedName, StringComparer.OrdinalIgnoreCase)).Select(g => g.Id).ToArray())).ToArray(),
-            groups.Select(g => new AdminGroup(g.Id, g.Name, g.GroupScope + " security", g.Members)).ToArray(), _policy.Templates,
+        List<string> destinations = [];
+        List<AdminGroup> groups = [];
+        List<AdminPerson> users = [];
+        foreach (var item in objects)
+        {
+            // A denied or unverifiable target is excluded. Authentication and policy failures
+            // are checked again after the scan, before publishing the new catalog.
+            try
+            {
+                if (item.Kind == ObjectKind.OrganizationalUnits && _policy.AllowsOu(item.DistinguishedName))
+                {
+                    var ou = One(item.DistinguishedName, "(&(objectClass=organizationalUnit)(!(isCriticalSystemObject=TRUE)))",
+                        "allowedChildClassesEffective", "objectGUID");
+                    if (Id(ou) == item.Id && LdapReader.Values(ou, "allowedChildClassesEffective").Contains("user", StringComparer.OrdinalIgnoreCase))
+                        destinations.Add(item.DistinguishedName);
+                }
+                if (item.Kind == ObjectKind.Groups && _policy.ApprovedGroups.Contains(item.Id))
+                {
+                    var group = Group(item.Id);
+                    if (LdapReader.Values(group, "allowedAttributesEffective").Contains("member", StringComparer.OrdinalIgnoreCase))
+                        groups.Add(new(item.Id, item.Name, item.GroupScope + " security", item.Members));
+                }
+            }
+            catch (DirectoryException) { continue; }
+        }
+        foreach (var item in objects.Where(o => o.Kind == ObjectKind.Users && (_created.Contains(o.Id) || _policy.ApprovedUsers.Contains(o.Id))))
+        {
+            try
+            {
+                var user = User(item.Id);
+                users.Add(new(item.Id, Profile(user), LiveObject.ParentOf(user.DistinguishedName), (Int(user, "userAccountControl") & 2) == 0,
+                    groups.Where(g => g.Members.Contains(user.DistinguishedName, StringComparer.OrdinalIgnoreCase)).Select(g => g.Id).ToArray())
+                {
+                    WritableAttributes = LdapReader.Values(user, "allowedAttributesEffective").ToHashSet(StringComparer.OrdinalIgnoreCase)
+                });
+            }
+            catch (DirectoryException) { continue; }
+        }
+        CheckActor();
+        _catalog = new(LabPolicy.Domain, destinations.Order().ToArray(), users.ToArray(), groups.ToArray(), _policy.Templates,
             objects.SelectMany(o => new[] { o.Account, o.EmployeeInfo?.Upn ?? "" }).ToArray());
     }
 
     private static Employee Profile(SearchResultEntry e) => new(Value(e, "givenName"), Value(e, "sn"), Value(e, "displayName"), Value(e, "sAMAccountName"),
         Value(e, "userPrincipalName"), Value(e, "department"), Value(e, "title"), Value(e, "mail"), Value(e, "description"));
-    private static Dictionary<string, string> Fields(Employee p) => new()
-    {
-        ["givenName"] = p.FirstName,
-        ["sn"] = p.LastName,
-        ["displayName"] = p.DisplayName,
-        ["department"] = p.Department,
-        ["title"] = p.Title,
-        ["mail"] = p.Email,
-        ["description"] = p.Description
-    };
     internal static AddRequest CreateDisabledRequest(string dn, Employee profile)
     {
         var request = new AddRequest(dn, "user");
         request.Attributes.Add(new DirectoryAttribute("cn", profile.Username));
-        foreach (var (name, value) in Fields(profile).Where(pair => pair.Value.Length > 0))
+        foreach (var (name, value) in profile.EditableAttributes().Where(pair => pair.Value.Length > 0))
             request.Attributes.Add(new DirectoryAttribute(name, value));
         request.Attributes.Add(new DirectoryAttribute("sAMAccountName", profile.Username));
         request.Attributes.Add(new DirectoryAttribute("userPrincipalName", profile.Upn));
@@ -262,8 +293,8 @@ internal sealed class LdapAdministration : IAdminBackend
                 var old = Profile(user); var profile = c.Profile!;
                 if (old != c.Expected?.Profile || profile.Username != old.Username || profile.Upn != old.Upn) throw new DirectoryException("Account attributes or identifiers changed since review.");
                 AdminValidation.EditedFields(old, profile);
-                var current = Fields(old);
-                foreach (var (k, v) in Fields(profile).Where(kv => current[kv.Key] != kv.Value)) request.Modifications.Add(Mod(k, DirectoryAttributeOperation.Replace, v));
+                var current = old.EditableAttributes();
+                foreach (var (k, v) in profile.EditableAttributes().Where(kv => current[kv.Key] != kv.Value)) request.Modifications.Add(Mod(k, DirectoryAttributeOperation.Replace, v));
                 before = old.Attributes; after = profile.Attributes; break;
             case AdminAction.AddMember:
             case AdminAction.RemoveMember:

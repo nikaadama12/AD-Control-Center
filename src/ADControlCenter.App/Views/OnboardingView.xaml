@@ -2,6 +2,7 @@
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <Border Style="{StaticResource Card}">
       <StackPanel>
+        <TextBlock Text="{Binding AccessMessage}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,0,0,8"/>
         <TextBlock Text="{Binding StepLabel}" Style="{StaticResource Tiny}" />
         <ProgressBar Height="3" Width="170" Maximum="6" Value="{Binding Stage,Mode=OneWay}" HorizontalAlignment="Left" Margin="0,7,0,5" AutomationProperties.Name="Onboarding progress" />
         <TextBlock Text="{Binding Heading}" Style="{StaticResource Heading}" Margin="0,6,0,16" />
@@ -111,7 +112,7 @@
         <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Danger}" TextWrapping="Wrap" Margin="0,8" />
         <StackPanel Orientation="Horizontal">
           <Button Content="Back" Command="{Binding Back}" Margin="0,0,8,0" />
-          <Button Content="Next" Command="{Binding Next}" Margin="0,0,8,0" />
+          <Button ToolTip="Continue after completing this step. An approved destination is required." Content="Next" Command="{Binding Next}" Margin="0,0,8,0" />
         </StackPanel>
       </StackPanel>
     </Border>

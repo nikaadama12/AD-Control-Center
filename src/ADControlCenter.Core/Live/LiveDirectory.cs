@@ -1,4 +1,6 @@
 using System.Net;
+using System.Security;
+using System.Text.Json;
 using ADControlCenter.Core.Admin;
 
 namespace ADControlCenter.Core.Live;
@@ -62,7 +64,31 @@ public sealed class LiveSession(ILiveConnector connector) : IDisposable
 {
     private ILiveReader? _reader;
     private Guid _administrationLease;
-    public IAdminBackend EnableAdministration(LabPolicy policy)
+    private Func<bool>? _policyMatches;
+    private IAdminBackend? _backend;
+    public bool AdministrationCurrent
+    {
+        get
+        {
+            if (!Connected || _administrationLease == Guid.Empty) return false;
+            try { if (_policyMatches?.Invoke() != false) return true; }
+            catch (Exception) { /* Unreadable or insecure machine policy revokes the lease. */ }
+            DisableAdministration();
+            return false;
+        }
+    }
+
+    public IAdminBackend EnableAdministration(Func<LabPolicy> loadPolicy)
+    {
+        DisableAdministration();
+        var policy = loadPolicy();
+        string approved = JsonSerializer.Serialize(policy);
+        return Activate(policy, () => JsonSerializer.Serialize(loadPolicy()) == approved);
+    }
+
+    public IAdminBackend EnableAdministration(LabPolicy policy) => Activate(policy, null);
+
+    private IAdminBackend Activate(LabPolicy policy, Func<bool>? matches)
     {
         DisableAdministration();
         policy.Validate();
@@ -70,10 +96,40 @@ public sealed class LiveSession(ILiveConnector connector) : IDisposable
         if (!Host.Equals(LabPolicy.Controller,StringComparison.OrdinalIgnoreCase) || _reader is not IAdministrationSource source ||
             !_reader.NamingContext.Equals(LabPolicy.Base,StringComparison.OrdinalIgnoreCase)) throw new DirectoryException("Administration requires the approved lab controller.");
         var lease = _administrationLease = Guid.NewGuid();
-        try { return source.Activate(policy, () => Objects, () => _administrationLease == lease && Connected); }
+        _policyMatches = matches;
+        bool Active() => _administrationLease == lease && AdministrationCurrent;
+        try
+        {
+            var backend = source.Activate(policy, () => Objects, Active);
+            _backend = new SessionBackend(backend, Active);
+            _backend.RefreshAccess();
+            return _backend;
+        }
         catch { DisableAdministration(); throw; }
     }
-    public void DisableAdministration() => _administrationLease = Guid.Empty;
+    private sealed class SessionBackend(IAdminBackend inner, Func<bool> active) : IAdminBackend
+    {
+        private void RequireActive()
+        {
+            if (!active()) throw new DirectoryException("Administration approval expired. Authorize this connection again.");
+        }
+        public string Actor => inner.Actor;
+        public void RefreshAccess() { RequireActive(); inner.RefreshAccess(); }
+        public AdminCatalog Catalog() { RequireActive(); return inner.Catalog(); }
+        public PreparedChange Prepare(AdminCommand command, SecureString? password)
+        {
+            RequireActive();
+            var change = inner.Prepare(command, password);
+            return change with { Commit = () => { RequireActive(); return change.Commit(); } };
+        }
+    }
+
+    public void DisableAdministration()
+    {
+        _administrationLease = Guid.Empty;
+        _policyMatches = null;
+        _backend = null;
+    }
     public bool Connected => _reader != null;
     public IReadOnlyList<LiveObject> Objects { get; private set; } = [];
     public string Host { get; private set; } = "";
@@ -99,9 +155,20 @@ public sealed class LiveSession(ILiveConnector connector) : IDisposable
     public void Refresh(CancellationToken token)
     {
         var reader = _reader ?? throw new DirectoryException("Connect to a controller first.");
-        var snapshot = reader.Read(token);
-        token.ThrowIfCancellationRequested();
-        Objects = snapshot;
+        var previous = Objects;
+        try
+        {
+            var snapshot = reader.Read(token);
+            token.ThrowIfCancellationRequested();
+            Objects = snapshot;
+            _backend?.RefreshAccess();
+        }
+        catch
+        {
+            Objects = previous;
+            DisableAdministration();
+            throw;
+        }
     }
     public void Dispose()
     {

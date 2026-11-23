@@ -6,6 +6,11 @@
         <ComboBox Margin="8,0,0,0" Width="230" ItemsSource="{Binding Locations}" SelectedItem="{Binding Parent}" ToolTip="{Binding Parent}" AutomationProperties.Name="Filter by parent"/>
         <ComboBox Margin="8,0,0,0" Width="112" ItemsSource="{Binding States}" SelectedItem="{Binding State}" AutomationProperties.Name="Filter by state"/>
       </WrapPanel>
+      <TextBlock Text="No objects match this view. Adjust the filters or refresh the inventory." Margin="0,4,0,8">
+        <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource Caption}"><Setter Property="Visibility" Value="Collapsed"/>
+          <Style.Triggers><DataTrigger Binding="{Binding Result.Total}" Value="0"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+        </Style></TextBlock.Style>
+      </TextBlock>
       <Expander Header="OU hierarchy" Foreground="{DynamicResource Text}" Visibility="{Binding IsHierarchy,Converter={StaticResource Show}}" Margin="0,2,0,8" IsExpanded="True">
         <TreeView MaxHeight="145" Background="{DynamicResource Field}" BorderBrush="{DynamicResource Line}" ItemsSource="{Binding Roots}">
           <TreeView.ItemTemplate><HierarchicalDataTemplate ItemsSource="{Binding Children}"><TextBlock Text="{Binding Entry.Name}" Foreground="{DynamicResource Text}" ToolTip="{Binding Entry.DistinguishedName}"/></HierarchicalDataTemplate></TreeView.ItemTemplate>

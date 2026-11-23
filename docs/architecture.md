@@ -32,7 +32,7 @@ Reports use unique filenames and a temporary file before publication. CSV export
 
 Version 1.1 also injects an `ILiveConnector`. An authenticated connection returns an `ILiveReader`, which exposes inventory reads and disposal. The Windows LDAP adapter binds explicitly, discovers the domain naming context and issues search requests with paging controls. Referrals and automatic reconnects are disabled. Large membership attributes are read in ranges.
 
-The shell serializes network operations and publishes a new snapshot only after all pages succeed. Live navigation, command eligibility and execution are distinct from the demo mutation path. A failed test or incomplete initial load keeps the app in Demo Mode. Disconnect discards the session's objects and audit entries. Export uses the existing encoders and a dedicated private folder.
+The shell serializes network operations and publishes a new snapshot only after all pages succeed. One ordered navigation collection serves all three modes. The shell chooses a page model for the current session and gates commands separately. Read-only management uses the inventory reader. An administration form is bound to the workflow that issued it. The live backend independently checks its connection and policy before preparation and submission. A failed test or incomplete initial load keeps the app in Demo Mode. Disconnect discards the session's objects and audit entries. Export uses the existing encoders and a dedicated private folder.
 
 ## Scoped administration
 

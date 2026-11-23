@@ -14,22 +14,29 @@ public sealed partial class ShellViewModel : Bindable
     private object _page;
     private string _status = "Workspace ready";
     private ImportPreview? _preview;
-    private NavItem[] DemoNavigation { get; } = [new("Dashboard","Dashboard"), new("Users","Users"), new("Computers","Computers"),
-        new("Groups","Groups"), new("Bulk Operations","Bulk"), new("Reports","Reports"), new("Audit Logs","Audit")];
-    public NavItem SettingsNav { get; } = new("Settings", "Settings");
-    public NavItem Current { get => _current; private set { Set(ref _current, value); Changed(nameof(Title)); Changed(nameof(Subtitle)); } }
+    public IReadOnlyList<NavItem> Navigation { get; } = Array.AsReadOnly<NavItem>([
+        new("Dashboard", "Dashboard"), new("Users", "Users"), new("Computers", "Computers"),
+        new("Groups", "Groups"), new("Organizational Units", "Directory"), new("Bulk Operations", "Bulk"),
+        new("Reports", "Reports"), new("Audit Logs", "Audit"), new("Connection Manager", "Shield"),
+        new("Onboarding", "Users"), new("Account Administration", "Groups"),
+        new("Administration History", "Audit"), new("Settings", "Settings")
+    ]);
+    public NavItem Current { get => _current; private set { Set(ref _current, value); Changed(nameof(Title)); Changed(nameof(Subtitle)); Changed(nameof(ShowAuthorization)); } }
     public object Page { get => _page; private set { if (_page is IDisposable disposable) disposable.Dispose(); Set(ref _page, value); } }
     public string Status { get => _status; private set => Set(ref _status, value); }
     public string Title => Current.Name switch { "Dashboard" => "Directory overview", "Bulk Operations" => "Bulk operations", "Audit Logs" => "Audit logs", _ => Current.Name };
     public string Subtitle => Current.Name switch {
+        "Onboarding" when ShowAuthorization => "Browse directory locations. Administration approval determines which destinations can be used for onboarding.",
+        "Account Administration" when ShowAuthorization => "Inspect accounts and memberships in the current directory snapshot.",
         "Onboarding" => "Create an employee account with a reviewed OU, memberships and initial settings.",
-        "Account administration" => "Review supported attributes, account state and direct group membership.",
-        "Administration history" => "Application activity with before and requested after values. Independent of AD security auditing.",
+        "Account Administration" => "Review supported attributes, account state and direct group membership.",
+        "Administration History" => "Application activity with before and requested after values. Independent of AD security auditing.",
         _ => DefaultSubtitle
     };
     private string DefaultSubtitle => Current.Name == "Connection Manager" ? "Test authentication and manage your protected directory session." : IsLive ?  $"{ModeLabel} · {_loaded:g}" : Current.Name switch
     {
         "Dashboard" => "Account health and activity across your local directory.",
+        "Organizational Units" => "Browse locations represented in the fictional inventory.",
         "Users" => "Manage fictional user accounts and simulate account operations.",
         "Computers" => "Inspect device inventory and identify inactive computer accounts.",
         "Groups" => "Manage security groups and their directory memberships.",
@@ -41,18 +48,22 @@ public sealed partial class ShellViewModel : Bindable
     public string Today => DateTime.Now.ToString("ddd, MMM d, yyyy");
     public ICommand Navigate { get; }
     public ICommand Run { get; }
-    public ShellViewModel(IDirectoryService directory, IDemoWorkspace workspace, IInteraction ui, ILiveConnector connector, string? liveExportFolder = null)
+    public ShellViewModel(IDirectoryService directory, IDemoWorkspace workspace, IInteraction ui, ILiveConnector connector, string? liveExportFolder = null, Func<LabPolicy>? policyLoader = null, IAdminAudit? liveAudit = null)
     {
         PrivateExports = liveExportFolder ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AD Control Center", "LiveExports");
+        _liveJournal = liveAudit ?? new FileAdminAudit(Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AD Control Center",
+            "Administration", "audit.jsonl"), live: true);
+        _loadPolicy = policyLoader ?? LabPolicy.Load;
         _live = new(connector);
         _directory = directory;
         if (directory is DemoDirectoryService demo) _demoAdmin=new(demo,new FileAdminAudit(demo.DemoAuditPath));
         _workspace = workspace;
         _ui = ui;
-        _current = DemoNavigation[0];
+        _current = Navigation[0];
         workspace.Record("Workspace opened", "northstar.example", "Success", "Local DEMO workspace initialized.");
         _page = new DashboardPage(directory.GetInventory(), workspace.Audit);
-        Navigate = new Command(p => Safe("Navigation", () => Open(p is NavItem n ? n.Name : p?.ToString() ?? "Dashboard")), p => !Busy && (!IsLive || (p as NavItem)?.Name != "Settings"));
+        Navigate = new Command(p => Safe("Navigation", () => Open(p is NavItem n ? n.Name : p?.ToString() ?? "Dashboard")), _ => !Busy);
         Run = new Command(p => Safe(p?.ToString() ?? "Command", () => Execute(p!.ToString()!)), p => Available(p?.ToString()));
     }
 
@@ -69,10 +80,12 @@ public sealed partial class ShellViewModel : Bindable
     }
     private void Open(string name)
     {
-        if (Busy || IsLive && !Navigation.Any(n => n.Name == name)) return;
+        if (Busy) return;
         string? filter = name == "Stale" ? "Stale" : null;
         if (filter != null) name = "Computers";
-        Current = Navigation.Append(SettingsNav).First(n => n.Name == name);
+        var item = Navigation.FirstOrDefault(n => n.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (item == null) return;
+        Current = item;
         Record("Page viewed", name, "Success", "Opened workspace page.");
         Load(filter: filter);
         Status = $"{name} ready";
@@ -80,24 +93,48 @@ public sealed partial class ShellViewModel : Bindable
 
     private void Load(bool preserve = false, string? filter = null)
     {
+        try { LoadCurrent(preserve, filter); }
+        catch
+        {
+            Page = new SectionNotice("This page could not be loaded", "Check the status below, then refresh to try again.");
+            throw;
+        }
+    }
+
+    private void LoadCurrent(bool preserve, string? filter)
+    {
         if (ActiveWorkflow is { } workflow)
         {
-            object? page=Current.Name switch {
-                "Onboarding"=>new OnboardingPage(workflow,IsLive,_ui,RunAdminAsync),
-                "Account administration"=>new AccountAdminPage(workflow,IsLive,_ui,RunAdminAsync),
-                "Administration history"=>new AdminHistoryPage(workflow.History()),
-                _=>null
+            object? editor = null;
+            Task<AdminResult> RunFromPage(Func<AdminResult> work)
+            {
+                if (!ReferenceEquals(Page, editor)) throw new DirectoryException("This administration page is no longer active.");
+                return RunAdminAsync(workflow, work);
+            }
+            editor = Current.Name switch
+            {
+                "Onboarding" => new OnboardingPage(workflow, IsLive, _ui, RunFromPage),
+                "Account Administration" => new AccountAdminPage(workflow, IsLive, _ui, RunFromPage),
+                "Administration History" => new AdminHistoryPage(workflow.History()),
+                _ => null
             };
-            if(page!=null){Page=page;return;}
+            if (editor != null) { Page = editor; return; }
         }
         if (IsLive) { LoadLive(); return; }
         var d = _directory.GetInventory();
         Page = Current.Name switch
         {
+            "Onboarding" or "Account Administration" or "Administration History" =>
+                new SectionNotice("Administration is unavailable", "The current demo provider does not supply an administration workflow."),
             "Connection Manager" => new ConnectionPage(),
             "Dashboard" => new DashboardPage(d, _workspace.Audit),
             "Bulk Operations" => new BulkPage(_preview, AuditViewChange),
             "Reports" => new ReportsPage(_workspace.Settings.ExportDirectory),
+            "Organizational Units" => new LiveRecordsPage(d.Users.Select(u => u.Department)
+                .Concat(d.Computers.Select(c => c.Department)).Where(unit => !string.IsNullOrWhiteSpace(unit))
+                .Distinct(StringComparer.OrdinalIgnoreCase).Select(unit => new LiveObject(ObjectKind.OrganizationalUnits,
+                    unit, "OU=" + unit.Replace("\\", "\\\\").Replace(",", "\\,") + ",DC=northstar,DC=example",
+                    "", "", "", "", "Fictional directory location", "", null, [], [])), ObjectKind.OrganizationalUnits),
             "Settings" => new SettingsPage(_workspace.Settings),
             _ => new RecordsPage(Current.Name, d, _workspace.Audit, AuditViewChange,
                 preserve ? Page as RecordsPage : null, filter)
@@ -111,20 +148,27 @@ public sealed partial class ShellViewModel : Bindable
     private bool Available(string? action) => !Busy && (IsLive ? action switch
     {
         "Refresh" or "Disconnect" => true,
-        "EnableAdministration" => !IsAdministration && Page is ConnectionPage,
+        "EnableAdministration" => !IsAdministration && (Page is ConnectionPage || IsManagementPage),
+        "ApplyAppearance" => Page is LiveAppearancePage,
         "EndAdministration" => IsAdministration && Page is ConnectionPage,
         "Export" => Page is ReportsPage,
         "View" => Page is LiveRecordsPage { Selected: not null } || Selected != null,
         _ => false
-    } : action is not ("Disconnect" or "EnableAdministration" or "EndAdministration") && action switch
+    } : action switch
     {
-        "View" or "Edit" => Selected != null,
+        "View" => Selected != null || Page is LiveRecordsPage { Selected: not null },
+        "Edit" => Selected is DirectoryUser or DirectoryGroup,
+        "New" => Current.Name is "Users" or "Groups",
+        "Import" => Page is BulkPage,
+        "SaveSettings" or "Folder" or "Clear" or "Reset" => Page is SettingsPage,
         "Enable" => Selected is DirectoryUser { Enabled: false },
         "Disable" => Selected is DirectoryUser { Enabled: true },
         "Unlock" => Selected is DirectoryUser { Locked: true },
         "ResetPassword" => Selected is DirectoryUser,
-        "Apply" => _preview?.CanApply == true,
-        _ => true
+        "Apply" => Page is BulkPage && _preview?.CanApply == true,
+        "Export" => Page is ReportsPage,
+        "Refresh" => true,
+        _ => false
     });
 
     private bool Confirm(string action, string target, string details, string accept)
@@ -148,6 +192,7 @@ public sealed partial class ShellViewModel : Bindable
             case "Refresh":
                 Record("View refreshed", Current.Name, "Success", "Reloaded the local directory view.");
                 Load(true); Status = "Directory refreshed"; break;
+            case "View" when Page is LiveRecordsPage { Selected: { } unit }: _ui.Inform(unit.Name, unit.Details); break;
             case "View": ViewSelected(); break;
             case "New": case "Edit": Edit(action == "Edit"); break;
             case "Enable":

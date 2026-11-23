@@ -8,12 +8,20 @@ namespace ADControlCenter.Core.Admin;
 public sealed record Employee(string FirstName, string LastName, string DisplayName, string Username, string Upn,
     string Department, string Title, string Email, string Description)
 {
+    public Dictionary<string, string> EditableAttributes() => new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["givenName"] = FirstName, ["sn"] = LastName, ["displayName"] = DisplayName,
+        ["department"] = Department, ["title"] = Title, ["mail"] = Email, ["description"] = Description
+    };
     public static Employee Empty => new("", "", "", "", "", "", "", "", "");
     public string Attributes => $"Name={DisplayName}; given={FirstName}; surname={LastName}; account={Username}; UPN={Upn}; department={Department}; title={Title}; email={Email}; description={Description}";
 }
 
 public sealed record AdminPerson(Guid Id, Employee Profile, string Location, bool Enabled, IReadOnlyList<Guid> Groups)
 {
+    // Demo users have unrestricted fictional fields. LDAP always supplies an explicit set.
+    public IReadOnlySet<string>? WritableAttributes { get; init; }
+    public bool Allows(string attribute) => WritableAttributes == null || WritableAttributes.Contains(attribute);
     public string Label => $"{Profile.DisplayName} ({Profile.Username})";
 }
 
@@ -29,6 +37,7 @@ public sealed record PreparedChange(string Target, string Before, string After, 
 public interface IAdminBackend
 {
     string Actor { get; }
+    void RefreshAccess() { }
     AdminCatalog Catalog();
     PreparedChange Prepare(AdminCommand command, SecureString? password);
 }
@@ -153,7 +162,13 @@ public sealed class AdminWorkflow(IAdminBackend backend, IAdminAudit audit)
         var catalog = Catalog();
         var requested = groups.Distinct().ToArray();
         AdminValidation.Groups(requested, catalog);
-        if (!catalog.Users.Any(u => u.Id == current.Id)) throw new DirectoryException("Select an approved disposable user.");
+        AdminValidation.Groups(current.Groups.Except(requested), catalog);
+        var authorized = catalog.Users.SingleOrDefault(u => u.Id == current.Id)
+            ?? throw new DirectoryException("Select an approved disposable user.");
+        var before = current.Profile.EditableAttributes();
+        if ((enabled != current.Enabled && !authorized.Allows("userAccountControl")) ||
+            profile.EditableAttributes().Any(pair => before[pair.Key] != pair.Value && !authorized.Allows(pair.Key)))
+            throw new DirectoryException("The controller has not advertised write access to a requested attribute.");
         List<AdminCommand> commands = [];
         if (profile != current.Profile)
         {

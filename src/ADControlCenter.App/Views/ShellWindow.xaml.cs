@@ -27,6 +27,10 @@ public partial class ShellWindow : Window
             };
             shell.PropertyChanged += finished;
         };
+        var policyTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        policyTimer.Tick += (_, _) => (DataContext as Presentation.ShellViewModel)?.CheckAdministrationPolicy();
+        Loaded += (_, _) => policyTimer.Start();
+        Closed += (_, _) => policyTimer.Stop();
         var area = SystemParameters.WorkArea;
         Width = Math.Min(Width, area.Width);
         Height = Math.Min(Height, area.Height);

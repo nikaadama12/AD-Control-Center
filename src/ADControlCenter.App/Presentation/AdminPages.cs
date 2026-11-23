@@ -8,7 +8,20 @@ namespace ADControlCenter.App.Presentation;
 public sealed class EmployeeForm : Bindable
 {
     private Employee _p;
-    public EmployeeForm(Employee p) => _p = p;
+    private readonly Func<string, bool> _allows;
+    public EmployeeForm(Employee p, Func<string, bool>? allows = null)
+    {
+        _p = p;
+        _allows = allows ?? (_ => true);
+    }
+    public bool CanEditFirstName => _allows("givenName");
+    public bool CanEditLastName => _allows("sn");
+    public bool CanEditDisplayName => _allows("displayName");
+    public bool CanEditDepartment => _allows("department");
+    public bool CanEditTitle => _allows("title");
+    public bool CanEditEmail => _allows("mail");
+    public bool CanEditDescription => _allows("description");
+
     public Employee Value => _p;
     public string FirstName { get => _p.FirstName; set { _p = _p with { FirstName = value }; Changed(); } }
     public string LastName { get => _p.LastName; set { _p = _p with { LastName = value }; Changed(); } }
@@ -50,6 +63,8 @@ public sealed class OnboardingPage : Bindable, IDisposable
     private bool _working;
     private string _error = "";
     public EmployeeForm Form { get; } = new(Employee.Empty);
+    public string AccessMessage => Locations.Length == 0 ? "No approved destination currently permits user creation. Refresh after delegation changes."
+        : _live ? "Only approved destinations with user-creation access are listed. Password policy and inherited rights are checked by the controller during setup." : "";
     public string[] Locations => _catalog.Locations;
     public string Location { get; set; } = "";
     public GroupPick[] Groups { get; }
@@ -90,7 +105,7 @@ public sealed class OnboardingPage : Bindable, IDisposable
         (_workflow, _live, _ui, _run) = (workflow, live, ui, run);
         _catalog = workflow.Catalog();
         Groups = _catalog.Groups.Select(g => new GroupPick(g, false, () => Changed(nameof(Review)))).ToArray();
-        Next = new Command(_ => Advance(), _ => !_working && Stage < 5);
+        Next = new Command(_ => Advance(), _ => !_working && Stage < 5 && Locations.Length > 0);
         Back = new Command(_ => { Error = ""; if (Stage is 4 or 5) ClearPassword(); Stage--; }, _ => !_working && Stage is > 1 and < 6);
         Template = new Command(_ => UseTemplate(), _ => Stage == 3 && !_working);
         Apply = new Command(async _ => await SubmitAsync(), _ => Stage == 5 && !_working);
@@ -113,7 +128,7 @@ public sealed class OnboardingPage : Bindable, IDisposable
     private Hire Draft() => new(Form.Value, Location, Groups.Where(g => g.Selected).Select(g => g.Group.Id).ToArray(), Enabled, ChangeAtLogon);
     public void Advance()
     {
-        if (_working || Stage >= 5) return;
+        if (_working || Stage >= 5 || Locations.Length == 0) return;
         try
         {
             switch (Stage)
@@ -145,8 +160,12 @@ public sealed class OnboardingPage : Bindable, IDisposable
     }
     private void ShowDetails()
     {
-        var user = _workflow.Catalog().Users.FirstOrDefault(u => u.Id == Result?.User);
-        _ui.Inform("Account details", user == null ? "Refresh the inventory to view the account." : user.Profile.Attributes + "\nOU: " + user.Location + "\nEnabled: " + user.Enabled);
+        try
+        {
+            var user = _workflow.Catalog().Users.FirstOrDefault(u => u.Id == Result?.User);
+            _ui.Inform("Account details", user == null ? "Refresh the inventory to view the account." : user.Profile.Attributes + "\nOU: " + user.Location + "\nEnabled: " + user.Enabled);
+        }
+        catch (DirectoryException e) { Error = e.Message; }
     }
 }
 
@@ -171,6 +190,7 @@ public sealed class AccountAdminPage : Bindable
     public AdminPerson? User { get => _user; set { if (Set(ref _user, value)) Select(); } }
     public string Message { get => _message; private set => Set(ref _message, value); }
     public string MembershipChanges => string.Join("\n", Picks.Where(g => g.Original != g.Selected).Select(g => (g.Selected ? "Add   " : "Remove   ") + g.Group.Name).DefaultIfEmpty("No membership changes."));
+    public string GroupAccessMessage => Picks.Length > 0 ? "" : "No approved groups are available for membership changes.";
     public string CurrentMemberships => string.Join(", ", Picks.Where(g => g.Original).Select(g => g.Group.Name).DefaultIfEmpty("None"));
     public ICommand Save { get; }
     public ICommand Members { get; }
@@ -179,14 +199,19 @@ public sealed class AccountAdminPage : Bindable
     {
         (_workflow, _live, _ui, _run) = (workflow, live, ui, run); _catalog = workflow.Catalog();
         Select();
-        Save = new Command(async _ => await SaveAsync(), _ => User != null && !_working);
+        Save = new Command(async _ => await SaveAsync(), _ => User is { } selected && !_working && (selected.Profile.EditableAttributes().Keys.Any(selected.Allows) || CanSetEnabled || Picks.Length > 0));
         Members = new Command(p => { if (p is AdminGroup group) _ui.Inform(group.Name + " · " + group.Scope, string.Join("\n", group.Members.DefaultIfEmpty("No direct members."))); });
     }
+    public bool CanSetEnabled => User?.Allows("userAccountControl") == true;
+    public bool HasUser => User != null;
+    public string AccessMessage => _catalog.Users.Length == 0 ? "No approved disposable accounts are available in this directory."
+        : User == null ? "Select an account to inspect its available actions."
+        : _live ? "Editable fields reflect delegated access. Membership choices include approved groups with member-write access." : "";
     private void Select()
     {
-        Form = new(User?.Profile ?? Employee.Empty); Enabled = User?.Enabled ?? false;
+        Form = new(User?.Profile ?? Employee.Empty, name => User?.Allows(name) == true); Enabled = User?.Enabled ?? false;
         Picks = _catalog.Groups.Select(g => new GroupPick(g, User?.Groups.Contains(g.Id) == true, () => Changed(nameof(MembershipChanges)))).ToArray();
-        foreach (string name in new[] { nameof(Form), nameof(Enabled), nameof(Picks), nameof(VisibleGroups), nameof(CurrentMemberships), nameof(MembershipChanges) }) Changed(name);
+        foreach (string name in new[] { nameof(Form), nameof(Enabled), nameof(Picks), nameof(VisibleGroups), nameof(CurrentMemberships), nameof(MembershipChanges), nameof(CanSetEnabled), nameof(HasUser), nameof(AccessMessage), nameof(GroupAccessMessage) }) Changed(name);
     }
     public async Task SaveAsync()
     {
@@ -213,4 +238,4 @@ public sealed class AccountAdminPage : Bindable
     }
 }
 
-public sealed record AdminHistoryPage(IReadOnlyList<AdminEvent> Entries);
+public sealed record AdminHistoryPage(IReadOnlyList<AdminEvent> Entries, string Caption = "Application-initiated operations · UTC");

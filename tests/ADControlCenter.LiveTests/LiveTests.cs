@@ -159,7 +159,8 @@ public sealed partial class LiveTests
                 shell.Run.Execute(action);
             }
             shell.Navigate.Execute("Bulk Operations");
-            Assert.AreSame(page, shell.Page);
+            Assert.IsInstanceOfType<SectionNotice>(shell.Page);
+            Assert.IsFalse(shell.Run.CanExecute("Import"));
             shell.Navigate.Execute("Reports");
             Assert.AreEqual(2, ((ReportsPage)shell.Page).Formats.Length);
             shell.Run.Execute("Export");

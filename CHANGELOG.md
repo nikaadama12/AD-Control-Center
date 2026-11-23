@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.2
+
+- Kept all 13 sidebar destinations accessible in every mode. Added a demo OU browser, read-only management views, connection-specific appearance settings and explanations for restricted actions.
+- Added an authorization shortcut on read-only management pages and permission guidance in the mode badge, account editor and onboarding wizard.
+- Filtered live administration choices by policy, object protection and controller-advertised rights. Revoked outstanding write capabilities on policy change or failed access refresh.
+- Added offline coverage for mode transitions, all sidebar destinations, read-only commands, scoped editing and revocation after a change has been prepared.
+
 ## 1.2.1
 
 - Added `ApprovedOperatorGroups` to the machine policy. The configured operator must match LDAP Who Am I and have current direct and effective membership in a verified lab-domain security group.

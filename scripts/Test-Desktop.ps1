@@ -95,6 +95,12 @@ try {
     $handle = Wait-For { $process.Refresh(); if ($process.HasExited) { throw 'The desktop application exited.' }; if ($process.MainWindowHandle -ne 0) { $process.MainWindowHandle } } 'the desktop window'
     $window = [Windows.Automation.AutomationElement]::FromHandle($handle)
     Wait-Text $window 'Directory overview'
+    foreach ($destination in @('Dashboard','Users','Computers','Groups','Organizational Units','Bulk Operations','Reports','Audit Logs','Connection Manager','Onboarding','Account Administration','Administration History','Settings')) {
+        [void](Wait-For { Find-Element $window $destination ([Windows.Automation.ControlType]::Button) } "sidebar item '$destination'")
+    }
+    Click-Button $window 'Organizational Units'
+    Wait-Text $window '6 objects   ·   Page 1 of 1'
+    Click-Button $window 'Dashboard'
     Snapshot 'dashboard'
     Click-Button $window 'Connection Manager'
     Wait-Text $window 'Secure directory connection'
@@ -266,14 +272,14 @@ try {
     Wait-Text $window 'Results'
     Click-Button $window 'Open account details'
     Confirm-Action $window 'Account details' 'Close'
-    Click-Button $window 'Account administration'
+    Click-Button $window 'Account Administration'
     Set-Field $window 'Find disposable account' 'river.fixture'
     Choose-Option $window 'Disposable account' 'River Fixture (river.fixture)'
     Set-Field $window 'Job title' 'Systems Analyst'
     Click-Button $window 'Review and apply…'
     Confirm-Action $window 'Apply demo changes?' 'Apply changes'
     Wait-Text $window 'EditAttributes · Success · Acknowledged.'
-    Click-Button $window 'Administration history'
+    Click-Button $window 'Administration History'
     Wait-Text $window 'Application-initiated operations · UTC'
     $audit = Get-Content -LiteralPath (Join-Path $testData 'demo-administration.jsonl') -Encoding UTF8 | ForEach-Object { $_ | ConvertFrom-Json }
     if (@($audit | Where-Object { $_.Outcome -eq 'Success' }).Count -ne 5) { throw 'Onboarding or edit acknowledgement missing.' }
