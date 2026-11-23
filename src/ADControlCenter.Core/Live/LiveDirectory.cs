@@ -64,7 +64,9 @@ public sealed class LiveSession(ILiveConnector connector) : IDisposable
     private Guid _administrationLease;
     public IAdminBackend EnableAdministration(LabPolicy policy)
     {
+        DisableAdministration();
         policy.Validate();
+        if (policy.ApprovedOperatorGroups.Length == 0) throw new DirectoryException("Configure an approved operator group SID before enabling administration.");
         if (!Host.Equals(LabPolicy.Controller,StringComparison.OrdinalIgnoreCase) || _reader is not IAdministrationSource source ||
             !_reader.NamingContext.Equals(LabPolicy.Base,StringComparison.OrdinalIgnoreCase)) throw new DirectoryException("Administration requires the approved lab controller.");
         var lease = _administrationLease = Guid.NewGuid();

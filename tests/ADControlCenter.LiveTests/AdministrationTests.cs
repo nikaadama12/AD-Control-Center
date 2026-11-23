@@ -341,7 +341,7 @@ public sealed class AdministrationTests
     {
         using var session = new LiveSession(new FakeConnection(_backend));
         session.Open(new Controller("other.example.test", Protection.Kerberos), new(), false, default);
-        Assert.ThrowsExactly<DirectoryException>(() => session.EnableAdministration(new LabPolicy { OperatorId = Guid.NewGuid() }));
+        Assert.ThrowsExactly<DirectoryException>(() => session.EnableAdministration(new LabPolicy { OperatorId = Guid.NewGuid(), ApprovedOperatorGroups = ["S-1-5-21-1-2-3-1400"] }));
     }
 
     private sealed class FakeConnection(IAdminBackend backend) : ILiveReader, IAdministrationSource, ILiveConnector
@@ -354,11 +354,28 @@ public sealed class AdministrationTests
         public void Dispose() { }
     }
     [TestMethod]
+    public void LegacyPolicyCannotActivateOrRetainAnEarlierSessionCapability()
+    {
+        var transport = new FakeConnection(_backend);
+        using var session = new LiveSession(transport);
+        session.Open(new Controller(LabPolicy.Controller, Protection.Kerberos), new(), false, default);
+        var legacy = new LabPolicy { OperatorId = Guid.NewGuid() };
+        legacy.Validate();
+        Assert.ThrowsExactly<DirectoryException>(() => session.EnableAdministration(legacy));
+        Assert.IsNull(transport.Active);
+        session.EnableAdministration(new LabPolicy { OperatorId = legacy.OperatorId, ApprovedOperatorGroups = ["S-1-5-21-1-2-3-1400"] });
+        var prior = transport.Active!;
+        Assert.ThrowsExactly<DirectoryException>(() => session.EnableAdministration(legacy));
+        Assert.IsFalse(prior());
+        Assert.IsTrue(session.Connected);
+    }
+
+    [TestMethod]
     public void AdministrationIsExplicitAndConnectionBound()
     {
         var transport = new FakeConnection(_backend); using var session = new LiveSession(transport);
         var controller = new Controller(LabPolicy.Controller, Protection.Kerberos);
-        var policy = new LabPolicy { OperatorId = Guid.NewGuid() };
+        var policy = new LabPolicy { OperatorId = Guid.NewGuid(), ApprovedOperatorGroups = ["S-1-5-21-1-2-3-1400"] };
         session.Open(controller, new(), false, default); Assert.IsNull(transport.Active);
         session.EnableAdministration(policy); var first = transport.Active!; Assert.IsTrue(first());
         session.DisableAdministration(); Assert.IsFalse(first());

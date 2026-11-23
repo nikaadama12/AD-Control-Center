@@ -1,6 +1,6 @@
 # AD Control Center
 
-AD Control Center **1.2.0** is a Windows desktop portfolio project for practicing directory administration. It starts in **DEMO MODE**. A live connection opens in **LIVE READ-ONLY MODE**. A delegated operator can explicitly enable **LIVE ADMINISTRATION MODE** for the isolated AppTesting lab. The demo opens a fictional **northstar.example** workspace with **128 users, 84 computers, and 12 security groups**. Explore account health, review stale devices, simulate support tasks, and export the results from a standard Windows user session.
+AD Control Center **1.2.1** is a Windows desktop portfolio project for practicing directory administration. It starts in **DEMO MODE**. A live connection opens in **LIVE READ-ONLY MODE**. A delegated operator can explicitly enable **LIVE ADMINISTRATION MODE** for the isolated AppTesting lab. The demo opens a fictional **northstar.example** workspace with **128 users, 84 computers, and 12 security groups**. Explore account health, review stale devices, simulate support tasks, and export the results from a standard Windows user session.
 
 ![AD Control Center dashboard showing the sample directory and its account health](docs/screenshots/dashboard.png)
 
@@ -34,11 +34,11 @@ Launch the application and select **Onboarding** to try the entire workflow offl
 
 ![Reviewing a fictional employee and their proposed memberships in Demo Mode](docs/screenshots/onboarding.png)
 
-For live use, install the machine-owned policy and delegate rights on the disposable lab objects first. Connect to `DC01.ad.lab.test`, then select **Connection Manager → Enable live administration…**. The red badge marks the write-capable session. **Return to read-only** revokes it. Each new connection starts read-only.
+For live use, install the machine-owned policy and delegate rights on the disposable lab objects first. Set `OperatorId` to the dedicated account GUID and `ApprovedOperatorGroups` to the exact SID of its ordinary lab delegation group. The operator needs current direct and effective membership. Only separately approved target group GUIDs belong in `ApprovedGroups`. Connect to `DC01.ad.lab.test`, then select **Connection Manager → Enable live administration…**. The red badge marks the write-capable session. **Return to read-only** revokes it. Each new connection starts read-only.
 
 [Onboarding guide](docs/onboarding.md) · [Delegated permissions and policy](docs/delegated-administration.md)
 
-[Lab DNS, transport requirements and step-by-step acceptance checks](docs/live-lab.md) · [Changelog](CHANGELOG.md) · [v1.2.0 release notes](docs/release-v1.2.md)
+[Lab DNS, transport requirements and step-by-step acceptance checks](docs/live-lab.md) · [Changelog](CHANGELOG.md) · [v1.2.1 release notes](docs/release-v1.2.1.md)
 
 ## Export a privacy-safe summary
 

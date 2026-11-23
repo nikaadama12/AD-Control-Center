@@ -89,20 +89,21 @@ internal sealed class LdapAdministration : IAdminBackend
         _policy.RequireGroup(id);
         var e = ById(id, "(objectClass=group)");
         Ordinary(e);
+        _policy.RequireSeparateGroup(id, Sid(e).Value);
         Ou(LiveObject.ParentOf(e.DistinguishedName));
         int type = Int(e, "groupType");
         LabPolicy.RequireGroupType(type, HasAttribute(e, "memberOf"));
         return e;
     }
-    private void CheckToken(SearchResultEntry e, IEnumerable<string> allowedGroupSids)
+    private string[] ReadEffectiveGroups(SearchResultEntry e)
     {
-        var domain = Sid(e).AccountDomainSid?.Value ?? throw new DirectoryException("Domain SID unavailable.");
-        var evidence = One(e.DistinguishedName, "(objectClass=user)", "tokenGroups");
+        var evidence = One(e.DistinguishedName, "(objectClass=user)", "tokenGroups", "objectGUID", "objectSid");
+        if (Id(evidence) != Id(e) || !Sid(evidence).Equals(Sid(e))) throw new DirectoryException("Account identity changed during membership verification.");
         if (evidence.Attributes.AttributeNames.Cast<string>().Any(n => n.StartsWith("tokenGroups;", StringComparison.OrdinalIgnoreCase)))
             throw new DirectoryException("Incomplete effective membership evidence.");
         var tokens = evidence.Attributes["tokenGroups"];
         if (tokens == null || tokens.Count == 0) throw new DirectoryException("Effective group membership could not be verified.");
-        LabPolicy.RequireMemberships(tokens.GetValues(typeof(byte[])).Cast<byte[]>().Select(b => new SecurityIdentifier(b, 0).Value), domain, Int(e, "primaryGroupID"), allowedGroupSids);
+        return tokens.GetValues(typeof(byte[])).Cast<byte[]>().Select(b => new SecurityIdentifier(b, 0).Value).ToArray();
     }
     private string CheckActor()
     {
@@ -110,7 +111,30 @@ internal sealed class LdapAdministration : IAdminBackend
         Ordinary(e);
         var id = Encoding.UTF8.GetString(((ExtendedResponse)Send(new ExtendedRequest("1.3.6.1.4.1.4203.1.11.3"))).ResponseValue);
         LabPolicy.RequireBoundActor(id, Sid(e).Value, Value(e, "msDS-PrincipalName"));
-        CheckToken(e, []);
+        if ((Int(e, "userAccountControl") & 2) != 0) throw new DirectoryException("The delegated operator account is disabled.");
+        string domainSid = Sid(One(LabPolicy.Base, "(objectClass=domainDNS)", "objectSid")).Value;
+        LabPolicy.RequireDomainPrincipal(Sid(e).Value, domainSid);
+
+        var direct = new List<string>();
+        foreach (string sid in _policy.ApprovedOperatorGroups)
+        {
+            LabPolicy.RequireDomainPrincipal(sid, domainSid);
+            var identifier = new SecurityIdentifier(sid);
+            var bytes = new byte[identifier.BinaryLength];
+            identifier.GetBinaryForm(bytes, 0);
+            string filter = $"(&(objectClass=group)(objectSid={string.Concat(bytes.Select(b => $"\\{b:x2}"))}))";
+            var rows = Search(LabPolicy.Base, filter, SearchScope.Subtree, Attributes).Entries;
+            if (rows.Count != 1 || Sid(rows[0]).Value != sid) throw new DirectoryException("Operator group resolution was missing or ambiguous.");
+            var group = rows[0];
+            Ordinary(group);
+            LabPolicy.RequireGroupType(Int(group, "groupType"), HasAttribute(group, "memberOf"));
+            _policy.RequireSeparateGroup(Id(group), sid);
+
+            // Re-read the member link on DC01. A cached logon token cannot keep a removed membership alive.
+            if (Search(group.DistinguishedName, $"(&{filter}(member={Escape(e.DistinguishedName)}))", SearchScope.Base, "1.1").Entries.Count == 1)
+                direct.Add(sid);
+        }
+        _policy.RequireOperatorMembership(ReadEffectiveGroups(e), domainSid, Int(e, "primaryGroupID"), direct);
         return Value(e, "sAMAccountName");
     }
     private SearchResultEntry User(Guid id)
@@ -122,7 +146,8 @@ internal sealed class LdapAdministration : IAdminBackend
         var flags = Int(e, "userAccountControl");
         if ((flags & 512) == 0 || (flags & (0x80000 | 0x1000000 | 0x2000 | 0x1000 | 0x800 | 0x4000000)) != 0)
             throw new DirectoryException("Service, trust and delegation-enabled accounts are excluded.");
-        CheckToken(e, _policy.ApprovedGroups.Select(id => Sid(Group(id)).Value));
+        var domainSid = Sid(e).AccountDomainSid?.Value ?? throw new DirectoryException("Domain SID unavailable.");
+        LabPolicy.RequireMemberships(ReadEffectiveGroups(e), domainSid, Int(e, "primaryGroupID"), _policy.ApprovedGroups.Select(id => Sid(Group(id)).Value));
         return e;
     }
     public AdminCatalog Catalog()

@@ -16,6 +16,7 @@ public sealed class LabPolicy
     public Guid OperatorId { get; init; }
     public string[] ChildOus { get; init; } = [];
     public Guid[] ApprovedUsers { get; init; } = [];
+    public string[] ApprovedOperatorGroups { get; init; } = [];
     public Guid[] ApprovedGroups { get; init; } = [];
     public Dictionary<string, Guid[]> Templates { get; init; } = new();
     public static string FilePath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "AD Control Center", "administration.json");
@@ -46,7 +47,7 @@ public sealed class LabPolicy
             RequireMachineOwned(file.Directory!);
             RequireMachineOwned(file);
             var policy = JsonSerializer.Deserialize<LabPolicy>(File.ReadAllText(FilePath),
-                new JsonSerializerOptions { UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow });
+                new JsonSerializerOptions { AllowDuplicateProperties = false, UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow });
             if (policy == null) throw new DirectoryException("Empty administration policy.");
             policy.Validate();
             return policy;
@@ -56,12 +57,46 @@ public sealed class LabPolicy
     }
     public void Validate()
     {
+        if (ApprovedOperatorGroups is null || ApprovedOperatorGroups.Any(sid => !IsOrdinaryDomainSid(sid)) ||
+            ApprovedOperatorGroups.Distinct(StringComparer.Ordinal).Count() != ApprovedOperatorGroups.Length)
+            throw new DirectoryException("Operator groups require unique, canonical domain group SIDs with ordinary RIDs.");
         if (OperatorId == Guid.Empty || ChildOus == null || ApprovedUsers == null || ApprovedGroups == null || Templates == null ||
             ApprovedUsers.Contains(OperatorId) || ApprovedGroups.Contains(OperatorId) || ApprovedUsers.Intersect(ApprovedGroups).Any() ||
             ApprovedUsers.Concat(ApprovedGroups).Contains(Guid.Empty) ||
             ChildOus.Any(dn => !InsideRoot(dn)) || Templates.Any(p => string.IsNullOrWhiteSpace(p.Key) || p.Value == null || p.Value.Except(ApprovedGroups).Any()))
             throw new DirectoryException("Invalid operator, OU, group or department template in the administration policy.");
     }
+    private static bool IsOrdinaryDomainSid(string? sid)
+    {
+        if (sid == null || !sid.StartsWith("S-1-5-21-", StringComparison.Ordinal)) return false;
+        var components = sid[9..].Split('-');
+        return components.Length == 4 && components.All(part =>
+            uint.TryParse(part, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var value)
+            && part == value.ToString(System.Globalization.CultureInfo.InvariantCulture))
+            && uint.Parse(components[3], System.Globalization.CultureInfo.InvariantCulture) >= 1000;
+    }
+
+    internal void RequireSeparateGroup(Guid groupId, string sid)
+    {
+        if (ApprovedGroups.Contains(groupId) && ApprovedOperatorGroups.Contains(sid, StringComparer.Ordinal))
+            throw new DirectoryException("An operator group cannot be a writable membership target.");
+    }
+
+    internal static void RequireDomainPrincipal(string sid, string trustedDomainSid)
+    {
+        if (!IsOrdinaryDomainSid(sid) || sid[..sid.LastIndexOf('-')] != trustedDomainSid)
+            throw new DirectoryException("The principal does not belong to the trusted lab domain.");
+    }
+
+    internal void RequireOperatorMembership(string[] effective, string domainSid, int primaryGroup, IEnumerable<string> direct)
+    {
+        foreach (string sid in ApprovedOperatorGroups) RequireDomainPrincipal(sid, domainSid);
+        RequireMemberships(effective, domainSid, primaryGroup, ApprovedOperatorGroups);
+        var matched = ApprovedOperatorGroups.Intersect(effective, StringComparer.Ordinal).ToHashSet(StringComparer.Ordinal);
+        if (matched.Count == 0 || !matched.SetEquals(direct) || !effective.Contains(domainSid + "-513", StringComparer.Ordinal))
+            throw new DirectoryException("The delegated operator requires current membership in an approved operator group.");
+    }
+
     private static bool InsideRoot(string? dn)
     {
         if (string.IsNullOrWhiteSpace(dn)) return false;

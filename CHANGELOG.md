@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1
+
+- Added `ApprovedOperatorGroups` to the machine policy. The configured operator must match LDAP Who Am I and have current direct and effective membership in a verified lab-domain security group.
+- Kept operator roles separate from writable group GUIDs. Policies with an overlapping role and write target fail live authorization.
+- Added regression coverage for removal of membership, mismatched principals, invalid and foreign SIDs, privileged groups and legacy policies.
+
 ## 1.2.0
 
 - Added a six-step employee onboarding wizard with configurable department templates, secure temporary password input, explicit confirmation and per-step results.

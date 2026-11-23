@@ -1,5 +1,6 @@
 {
   "OperatorId": "00000000-0000-4000-a000-000000000001",
+  "ApprovedOperatorGroups": ["S-1-5-21-111111111-222222222-333333333-1400"],
   "ChildOus": ["OU=QA,OU=AppTesting,DC=ad,DC=lab,DC=test"],
   "ApprovedUsers": ["00000000-0000-4000-a000-000000000002"],
   "ApprovedGroups": [
